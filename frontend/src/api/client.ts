@@ -124,3 +124,52 @@ export const api = {
 };
 
 export type Api = typeof api;
+
+import type {
+  AgentActivityResponse,
+  AuditEventFilters,
+  AuditReadinessReport,
+  GovernanceSummaryResponse,
+  WorkNeedingAttentionResponse,
+} from "./types";
+import type { AuditEvent as AuditEventType } from "./types";
+
+const GOVERNANCE = "/api/governance";
+
+/** Governance & audit read models — reporting only; nothing here can
+ * change workflow state. */
+export const governanceApi = {
+  summary: () => http<GovernanceSummaryResponse>(`${GOVERNANCE}/summary`),
+
+  agentActivity: () =>
+    http<AgentActivityResponse>(`${GOVERNANCE}/agent-activity`),
+
+  workNeedingAttention: () =>
+    http<WorkNeedingAttentionResponse>(`${GOVERNANCE}/work-needing-attention`),
+
+  productVolume: () =>
+    http<GovernanceSummaryResponse>(`${GOVERNANCE}/product-volume`),
+
+  processingTimeByProduct: () =>
+    http<GovernanceSummaryResponse>(`${GOVERNANCE}/processing-time-by-product`),
+
+  bottlenecks: () =>
+    http<GovernanceSummaryResponse>(`${GOVERNANCE}/bottlenecks`),
+
+  auditReadiness: () =>
+    http<AuditReadinessReport>(`${GOVERNANCE}/audit-readiness`),
+
+  responsePackageStatus: () =>
+    http<GovernanceSummaryResponse>(`${GOVERNANCE}/response-package-status`),
+
+  auditEvents: (filters: AuditEventFilters = {}) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(filters)) {
+      if (value) {
+        params.set(key, value);
+      }
+    }
+    const suffix = params.size > 0 ? `?${params.toString()}` : "";
+    return http<AuditEventType[]>(`/api/audit/events${suffix}`);
+  },
+};
