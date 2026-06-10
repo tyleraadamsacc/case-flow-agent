@@ -8,6 +8,7 @@ from fastapi import Request
 from app.config import Settings
 from app.mock_data.seed import seed_legal_requests
 from app.models.enums import ActorType
+from app.orchestration.agent_execution_service import AgentExecutionService
 from app.orchestration.approval_policy import ApprovalPolicy
 from app.orchestration.workflow_state_machine import WorkflowStateMachine
 from app.repositories.local_agent_run_repository import LocalAgentRunRepository
@@ -54,6 +55,13 @@ class Container:
         self.deficiency_service = DeficiencyService(mock_dir / "sop" / "deficiency_rules.json")
         self.governance_service = GovernanceMetricsService(
             self.legal_request_repository, self.audit_repository, self.approval_policy
+        )
+        self.agent_execution_service = AgentExecutionService(
+            self.legal_request_repository,
+            self.agent_run_repository,
+            self.response_record_repository,
+            self.audit_service,
+            mock_data_dir=mock_dir,
         )
 
     def seed(self) -> int:

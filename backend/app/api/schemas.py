@@ -1,7 +1,10 @@
-"""Typed request/response contracts for the PR 1 API surface."""
+"""Typed request/response contracts for the API surface."""
+
+from typing import Literal
 
 from datetime import date
 
+from app.models.agent_run import AgentRun
 from app.models.approval_decision import ApprovalDecision
 from app.models.audit_event import AuditEvent
 from app.models.base import CaseFlowModel
@@ -10,6 +13,8 @@ from app.models.enums import ReviewAction, ReviewTargetType
 from app.models.governance_metric import GovernanceMetric
 from app.models.human_review import HumanReview
 from app.models.legal_request import LegalRequest
+from app.models.production_package import ProductionPackage
+from app.models.text_draft import TextDraft
 from app.orchestration.approval_policy import ApprovalPolicyResult
 from app.services.sensitive_special_handling_service import SpecialHandlingCheck
 
@@ -77,3 +82,22 @@ class ActionResponse(CaseFlowModel):
 
 class GovernanceSummaryResponse(CaseFlowModel):
     metrics: list[GovernanceMetric]
+
+
+class RailRunResponse(CaseFlowModel):
+    """Six AgentRuns in rail order, served from the repository."""
+
+    legal_request: LegalRequest
+    agent_runs: list[AgentRun]
+
+
+class DraftRunResponse(CaseFlowModel):
+    """A single drafting run. Human approval is structurally required:
+    no draft produced by any agent carries a final status."""
+
+    agent_run: AgentRun
+    text_draft: TextDraft | None = None
+    production_package: ProductionPackage | None = None
+    requires_human_approval: Literal[True] = True
+    risk_flags: list[str] = []
+    audit_event_id: str | None = None
