@@ -3,15 +3,20 @@ from datetime import date
 from app.models.agent_run import AgentRun
 from app.models.approval_decision import ApprovalDecision
 from app.models.base import CaseFlowModel
+from app.models.classification_result import ClassificationResult
 from app.models.deficiency_finding import DeficiencyFinding
 from app.models.human_review import HumanReview
 from app.models.legal_authority import LegalAuthority
 from app.models.legal_process import LegalProcess
+from app.models.note_draft import NoteDraft
+from app.models.production_package import ProductionPackage
 from app.models.requested_data_category import RequestedDataCategory
 from app.models.requested_period import RequestedPeriod
 from app.models.requesting_agency import RequestingAgency
+from app.models.routing_recommendation import RoutingRecommendation
 from app.models.special_handling import SpecialHandlingFlags
 from app.models.subject_identifier import SubjectIdentifier
+from app.models.text_draft import TextDraft
 from app.models.workflow_state import WorkflowState
 
 
@@ -41,6 +46,13 @@ class LegalRequest(CaseFlowModel):
     reviews: list[HumanReview] = []
     approvals: list[ApprovalDecision] = []
     agent_runs: dict[str, AgentRun] = {}
+    # Drafted artifacts persisted by the execution bridge / drafting
+    # endpoints. All are drafts pending human review by construction.
+    classification: ClassificationResult | None = None
+    routing_recommendation: RoutingRecommendation | None = None
+    note_drafts: list[NoteDraft] = []
+    text_drafts: list[TextDraft] = []
+    production_package: ProductionPackage | None = None
     owner: str | None = None
     urgency_tier: str | None = None
     raw_source_uri: str | None = None
