@@ -15,6 +15,7 @@ from typing import Any
 
 from app.adk_agents import session_state
 from app.adk_agents.base import CaseFlowAgent
+from app.llm.model_assist import ModelAssist
 from app.adk_agents.registry import ETL_AGENT, OFFICIAL_AGENT_NAMES, TEXT_CONTENT_AGENT
 from app.adk_agents.shared import (
     blocking_deficiencies,
@@ -46,6 +47,21 @@ class TextContentAgent(CaseFlowAgent):
     """
 
     package_rules_path: str = ""
+
+    def llm_task_for(self, draft: AgentRunDraft) -> str | None:
+        """The model task depends on what was drafted. The model only
+        re-drafts narrative sections; the production package object —
+        including the record index — stays deterministic, and SME
+        notifications have no model task."""
+        text_draft = draft.output.get("text_draft")
+        if not isinstance(text_draft, dict):
+            return None
+        draft_type = text_draft.get("draft_type")
+        if draft_type == DraftType.DEFICIENCY_RESPONSE.value:
+            return "deficiency_response_drafting"
+        if draft_type == DraftType.SME_NOTIFICATION.value:
+            return None
+        return "response_package_drafting"
 
     def execute(self, state: dict[str, Any]) -> AgentRunDraft:
         request = session_state.get_legal_request(state)
@@ -167,9 +183,12 @@ class TextContentAgent(CaseFlowAgent):
         return "Drafted SME notification. Draft pending analyst approval — nothing is sent."
 
 
-def create_text_content_agent(mock_data_dir: Path = MOCK_DATA_DIR) -> TextContentAgent:
+def create_text_content_agent(
+    mock_data_dir: Path = MOCK_DATA_DIR, llm_assist: ModelAssist | None = None
+) -> TextContentAgent:
     return TextContentAgent(
         name=TEXT_CONTENT_AGENT,
+        llm_assist=llm_assist,
         display_name=OFFICIAL_AGENT_NAMES[TEXT_CONTENT_AGENT],
         description=(
             "Drafts response package, deficiency response, SME "

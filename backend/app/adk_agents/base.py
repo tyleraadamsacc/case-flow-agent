@@ -6,8 +6,10 @@ from google.adk.agents import BaseAgent
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event, EventActions
 from google.genai import types
+from pydantic import ConfigDict
 
-from app.adk_agents.session_state import run_key
+from app.adk_agents.session_state import LEGAL_REQUEST, run_key
+from app.llm.model_assist import ModelAssist
 from app.models.agent_run import AgentRunDraft
 from app.models.enums import AgentRunStatus
 
@@ -24,17 +26,45 @@ class CaseFlowAgent(BaseAgent):
     state delta. Blocked and failed runs are reported the same way — an
     agent never silently disappears from the rail.
 
+    Model assistance (plan §15): agents that declare ``llm_task`` and
+    receive a ``ModelAssist`` re-draft their payload through the
+    configured model AFTER the deterministic pass — the deterministic
+    output is always the fallback, and assisted output remains a draft
+    pending human review. ETL and Automation never declare a task.
+
     Execution layer only: no CaseFlow agent may finalize route, response
     package, production, release, or send actions — those transitions live
     behind code-enforced human approval in the FastAPI application layer.
     """
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     display_name: str
+    llm_task: str | None = None
+    llm_assist: ModelAssist | None = None
+
+    def llm_task_for(self, draft: AgentRunDraft) -> str | None:
+        """The model task for this draft; agents whose task depends on
+        the produced draft (Text Content) override this."""
+        del draft
+        return self.llm_task
 
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
         started = datetime.now(UTC)
         try:
-            draft = self.execute(dict(ctx.session.state))
+            state = dict(ctx.session.state)
+            draft = self.execute(state)
+            task = self.llm_task_for(draft)
+            if (
+                self.llm_assist is not None
+                and task is not None
+                and draft.status is AgentRunStatus.COMPLETE
+            ):
+                draft = self.llm_assist.apply(
+                    task=task,
+                    draft=draft,
+                    context={"legal_request": state.get(LEGAL_REQUEST)},
+                )
         except Exception as exc:  # noqa: BLE001 — failures must surface as audited runs
             draft = self.result(
                 status=AgentRunStatus.FAILED,

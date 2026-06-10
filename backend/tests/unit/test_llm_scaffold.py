@@ -72,9 +72,14 @@ def test_prompt_placeholders_exist_with_versioned_front_matter():
         assert "version:" in text and "task:" in text and "output_schema:" in text
 
 
-def test_no_hardcoded_model_ids_and_no_genai_dependency():
+def test_no_hardcoded_model_ids_and_genai_is_optional_only():
+    import tomllib
+
     for path in APP_DIR.rglob("*.py"):
         source = path.read_text()
         assert "gemini-" not in source, f"hardcoded model id in {path}"
-    pyproject = (APP_DIR.parent / "pyproject.toml").read_text()
-    assert "google-genai" not in pyproject
+    pyproject = tomllib.loads((APP_DIR.parent / "pyproject.toml").read_text())
+    core = " ".join(pyproject["project"]["dependencies"])
+    assert "google-genai" not in core, "google-genai must stay an optional extra"
+    extras = pyproject["project"]["optional-dependencies"]
+    assert any("google-genai" in dep for dep in extras.get("gemini", []))

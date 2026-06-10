@@ -1,6 +1,6 @@
 ---
 version: 0.1.0
-task: deficiency_response_draft
+task: deficiency_response_drafting
 output_schema: TextDraft
 status: placeholder — no live model integration exists in this codebase
 ---

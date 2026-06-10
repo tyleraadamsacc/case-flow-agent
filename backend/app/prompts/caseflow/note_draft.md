@@ -1,6 +1,6 @@
 ---
 version: 0.1.0
-task: note_draft
+task: note_drafting
 output_schema: NoteDraft
 status: placeholder — no live model integration exists in this codebase
 ---

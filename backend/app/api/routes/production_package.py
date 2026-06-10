@@ -63,7 +63,10 @@ def draft_production_package(
 ) -> DraftRunResponse:
     run = container.agent_execution_service.run_single(
         legal_request_id,
-        create_text_content_agent(container.settings.mock_data_dir),
+        create_text_content_agent(
+            container.settings.mock_data_dir,
+            container.agent_execution_service.llm_assist,
+        ),
     )
     return _draft_response(run)
 
@@ -85,7 +88,10 @@ def draft_deficiency_response(
 ) -> DraftRunResponse:
     run = container.agent_execution_service.run_single(
         legal_request_id,
-        create_text_content_agent(container.settings.mock_data_dir),
+        create_text_content_agent(
+            container.settings.mock_data_dir,
+            container.agent_execution_service.llm_assist,
+        ),
         requested_draft_type=DraftType.DEFICIENCY_RESPONSE.value,
     )
     return _draft_response(run)

@@ -34,6 +34,7 @@ from app.adk_agents.registry import (
     TRIAGING_AGENT,
 )
 from app.adk_agents.root_agent import create_caseflow_root_agent
+from app.llm.model_assist import ModelAssist
 from app.errors import AgentExecutionStateError, NotFoundError
 from app.logging_config import correlation_id_var
 from app.mock_data.seed import MOCK_DATA_DIR
@@ -94,12 +95,14 @@ class AgentExecutionService:
         response_record_repository: ResponseRecordRepository,
         audit_service: AuditService,
         mock_data_dir: Path = MOCK_DATA_DIR,
+        llm_assist: ModelAssist | None = None,
     ) -> None:
         self._requests = legal_request_repository
         self._runs = agent_run_repository
         self._records = response_record_repository
         self._audit = audit_service
         self._mock_data_dir = mock_data_dir
+        self.llm_assist = llm_assist
 
     def run_rail(self, legal_request_id: str) -> list[AgentRun]:
         """Run all six agents in rail order through CaseFlowRootAgent and
@@ -107,7 +110,8 @@ class AgentExecutionService:
         request = self._load(legal_request_id)
         initial_state = self._build_input_state(request)
         final_state = asyncio.run(
-            self._execute(create_caseflow_root_agent(self._mock_data_dir), initial_state)
+            self._execute(create_caseflow_root_agent(self._mock_data_dir, self.llm_assist),
+            initial_state,)
         )
         return self._persist(request, final_state, RAIL_ORDER)
 
