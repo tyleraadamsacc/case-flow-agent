@@ -1,0 +1,74 @@
+{
+  "legal_request_id": "LER-2026-004863",
+  "scenario": "F",
+  "source_type": "lers_request_template",
+  "date_received": "2026-06-06",
+  "raw_source_uri": "local://legal_requests/scenario_f_no_responsive_records.json",
+  "raw_source_text": "SEARCH WARRANT — [INSTRUCTIONS — PLEASE DELETE] To: Google LLC, Google Legal Investigations Support (LERS). The affiant requests GPS location records for account ACC-6630277 and device DEV-IMEI-90155 between the dates of 2026-02-01 and 2026-02-07 pursuant to 18 U.S.C. §2703. SYNTHETIC DATA — NOT A REAL LEGAL DOCUMENT.",
+  "extracted_fields": {
+    "legal_process": {
+      "type": "search_warrant",
+      "court_order_included": true,
+      "ex_parte_order": false,
+      "pen_register": false,
+      "trap_and_trace": false,
+      "location_tracking": true,
+      "stored_communications": true
+    },
+    "requesting_agency": {
+      "agency": "Pierce County Sheriff's Department (Synthetic)",
+      "case_number": "MC-26-60488",
+      "officer": "Deputy Lauren Ortiz",
+      "contact_email": "synthetic.deputy@example.gov",
+      "phone": "555-0106"
+    },
+    "subject_identifiers": [
+      {
+        "type": "account_id",
+        "value": "ACC-6630277",
+        "confidence": 0.98,
+        "source_span": "account ACC-6630277"
+      },
+      {
+        "type": "device_imei",
+        "value": "DEV-IMEI-90155",
+        "confidence": 0.97,
+        "source_span": "device DEV-IMEI-90155"
+      }
+    ],
+    "requested_data_categories": [
+      {
+        "category": "GPS Location Records",
+        "product_domain": "Maps / Location",
+        "sensitivity": "high",
+        "content_type": "location",
+        "requires_sme_review": false
+      }
+    ],
+    "product_domains": ["Maps / Location"],
+    "requested_period": {
+      "start": "2026-02-01T00:00:00Z",
+      "end": "2026-02-07T23:59:59Z"
+    },
+    "special_handling": {
+      "sealed": false,
+      "non_disclosure_to_subscriber": false,
+      "no_adverse_action": false,
+      "pen_register_requested": false,
+      "trap_and_trace_requested": false,
+      "ongoing_access_requested": false,
+      "location_tracking_requested": true,
+      "content_requested": false,
+      "tombstone_requested": false,
+      "production_deadline_days": 35,
+      "service_deadline_days": 14
+    },
+    "legal_authorities": [
+      {
+        "citation": "18 U.S.C. §2703",
+        "description": "Stored Communications Act",
+        "source_span": "pursuant to 18 U.S.C. §2703"
+      }
+    ]
+  }
+}

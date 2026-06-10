@@ -40,10 +40,15 @@ Requires Python 3.11+ and Node 18+.
 ```bash
 cp .env.local.example .env.local   # no credentials needed; defaults are fine
 make install                       # backend venv + frontend node_modules
-make test                          # backend test suite
+make test                          # backend test suite (unit + api)
 make dev-backend                   # FastAPI on http://localhost:8000 (GET /healthz)
 make dev-frontend                  # Vite dev server (proxies /healthz and /api to :8000)
 ```
+
+Mock data: the six synthetic scenario fixtures under
+`backend/app/mock_data/legal_requests/` are seeded automatically at startup
+(idempotent; set `CASEFLOW_SEED_ON_STARTUP=false` to disable). Interactive API
+docs are at `http://localhost:8000/docs`.
 
 ## Repository layout
 
@@ -54,9 +59,31 @@ caseflow_codex_handoff_docs_v3_six_agent_visibility/   source handoff documents
 CASEFLOW_APPLICATION_BUILD_PLAN_FOR_REVIEW.md          implementation plan and PR roadmap
 ```
 
+## Current state (PR 1)
+
+PR 1 implements the deterministic application foundation the ADK agents plug
+into in PR 2:
+
+- typed Pydantic domain models (`backend/app/models/`)
+- workflow state machine and code-enforced approval policy
+  (`backend/app/orchestration/`)
+- single-path audit service over an append-only local repository — an audit
+  write failure blocks the state transition
+- local JSON repositories (legal requests, audit, response records, storage)
+- deterministic request extraction (strips LERS-template placeholder text),
+  special-handling checker, and deficiency detection
+- six seeded synthetic scenarios (A–F) and an idempotent mock-data loader
+- APIs: request queue/detail/intake, extract, validate, review, approve,
+  escalate, send-to-qa (internal handoff only), audit timeline, global audit
+  query, and a minimal governance summary
+
+Intentionally deferred to PR 2+: the deterministic six-agent ADK workflow,
+`AgentRun` persistence, agent-run/agent-activity endpoints, response package
+and deficiency-response drafting, Gemini, retrieval/Agent Search, GCP
+adapters, and the frontend workflow screens.
+
 ## Roadmap
 
 The PR sequence and full build plan live in
 [CASEFLOW_APPLICATION_BUILD_PLAN_FOR_REVIEW.md](CASEFLOW_APPLICATION_BUILD_PLAN_FOR_REVIEW.md)
-(§18–§19). Current state: **PR 0 — application skeleton** (this scaffold). Domain models,
-the deterministic workflow, and the six-agent layer arrive in PR 1 and PR 2.
+(§18–§19).

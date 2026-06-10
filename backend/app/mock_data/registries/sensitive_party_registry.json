@@ -1,0 +1,16 @@
+{
+  "parties": [
+    {
+      "party_id": "REG-SENSITIVE-001",
+      "name": "Office of the Synthetic State Regulator",
+      "party_type": "regulator",
+      "notes": "Synthetic registry entry for the regulator/sensitive-sender golden scenario (wired in a later PR)."
+    },
+    {
+      "party_id": "REG-SENSITIVE-002",
+      "name": "Synthetic Federal Oversight Committee",
+      "party_type": "government_oversight",
+      "notes": "Synthetic registry entry; requests from this party require SME review."
+    }
+  ]
+}
