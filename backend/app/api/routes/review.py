@@ -23,6 +23,7 @@ from app.models.approval_decision import ApprovalDecision
 from app.models.audit_event import AuditEvent
 from app.models.enums import (
     ActorType,
+    AgentRunStatus,
     ApprovalDecisionType,
     AuditAction,
     ReviewAction,
@@ -103,7 +104,22 @@ def approve(
         request.workflow_state, WorkflowState.ANALYST_APPROVED
     )
 
+    # A blocked or failed latest agent run is unfinished business: the
+    # analyst must resolve it (approve the route and re-run the workflow,
+    # or request changes) before the request can finalize.
+    latest_runs: dict[str, object] = {}
+    for run in container.agent_run_repository.list_for_request(legal_request_id):
+        latest_runs[run.agent_id] = run
+    blocked_agents = [
+        run.agent_name
+        for run in latest_runs.values()
+        if run.status in (AgentRunStatus.BLOCKED, AgentRunStatus.FAILED)
+    ]
     policy = container.approval_policy.evaluate(request)
+    if blocked_agents:
+        policy.blocking_reasons.append(
+            "blocked_agent_runs: " + ", ".join(sorted(blocked_agents))
+        )
     if policy.blocking_reasons:
         container.audit_service.record(
             legal_request_id=legal_request_id,

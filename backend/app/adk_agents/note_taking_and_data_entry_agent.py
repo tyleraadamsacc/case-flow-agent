@@ -13,6 +13,7 @@ from app.adk_agents.base import CaseFlowAgent
 from app.llm.model_assist import ModelAssist
 from app.adk_agents.registry import NOTE_TAKING_AND_DATA_ENTRY_AGENT, OFFICIAL_AGENT_NAMES
 from app.adk_agents.shared import (
+    has_human_approval,
     blocking_deficiencies,
     is_overbroad,
     request_input_summary,
@@ -41,13 +42,16 @@ class NoteTakingAndDataEntryAgent(CaseFlowAgent):
             gaps.append("classification")
         # ETL output is only an expected upstream when the retrieval path
         # was actually supposed to run (no blocking/SME/overbroad hold).
-        etl_expected = not (
-            blocking_deficiencies(request)
-            or is_overbroad(request)
-            or (
-                classification is not None
-                and sme_reasons_present(
-                    [reason.value for reason in classification.review_reasons]
+        approved = has_human_approval(request)
+        etl_expected = not blocking_deficiencies(request) and (
+            approved
+            or not (
+                is_overbroad(request)
+                or (
+                    classification is not None
+                    and sme_reasons_present(
+                        [reason.value for reason in classification.review_reasons]
+                    )
                 )
             )
         )
@@ -90,7 +94,12 @@ class NoteTakingAndDataEntryAgent(CaseFlowAgent):
         requested = state.get(session_state.REQUESTED_NOTE_TYPE)
         if requested:
             return NoteType(requested)
-        if blocking_deficiencies(request) or is_overbroad(request):
+        if blocking_deficiencies(request):
+            return NoteType.DEFICIENCY_NOTE
+        if has_human_approval(request):
+            # Human approval recorded — the rerun documents response prep.
+            return NoteType.RESPONSE_PREP_NOTE
+        if is_overbroad(request):
             return NoteType.DEFICIENCY_NOTE
         if classification is not None and sme_reasons_present(
             [reason.value for reason in classification.review_reasons]

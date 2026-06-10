@@ -67,3 +67,14 @@ def request_input_summary(request: LegalRequest) -> str:
 
 def sme_reasons_present(reason_values: list[str]) -> list[str]:
     return [value for value in reason_values if value in SME_REVIEW_REASONS]
+
+
+def has_human_approval(request: LegalRequest) -> bool:
+    """A human has recorded an approving review or an approval decision.
+
+    The ETL Agent simulates an *approved* responsive data pull (plan §3):
+    special-handling and overbroad holds clear only once this is true.
+    Blocking deficiencies are never approval-clearable."""
+    if any(review.action.value == "approve" for review in request.reviews):
+        return True
+    return any(approval.decision.value == "approved" for approval in request.approvals)

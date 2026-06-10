@@ -14,6 +14,7 @@ from app.adk_agents import session_state
 from app.adk_agents.base import CaseFlowAgent
 from app.adk_agents.registry import AUTOMATION_AGENT, OFFICIAL_AGENT_NAMES
 from app.adk_agents.shared import (
+    has_human_approval,
     blocking_deficiencies,
     is_overbroad,
     request_input_summary,
@@ -103,7 +104,8 @@ class AutomationAgent(CaseFlowAgent):
                 sla_risk=sla_risk,
             )
 
-        if sme_reasons:
+        approved = has_human_approval(request)
+        if sme_reasons and not approved:
             phrases = [SME_REASON_PHRASES.get(reason, reason) for reason in sme_reasons]
             return AutomationOutput(
                 action_type="prepare_sme_escalation",
@@ -115,7 +117,7 @@ class AutomationAgent(CaseFlowAgent):
                 sla_risk=sla_risk,
             )
 
-        if is_overbroad(request):
+        if is_overbroad(request) and not approved:
             return AutomationOutput(
                 action_type="prepare_sme_assignment",
                 target="SME Review",
