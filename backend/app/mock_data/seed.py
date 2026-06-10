@@ -12,14 +12,23 @@ from app.services.audit_service import AuditService
 MOCK_DATA_DIR = Path(__file__).parent
 
 
+def fixtures_dir(mock_data_dir: Path, dataset: str = "full") -> Path:
+    """The active fixture directory: "demo" is the two-document LERS
+    scenario only; "full" is the eight-test-scenario corpus."""
+    return mock_data_dir / (
+        "legal_requests_demo" if dataset == "demo" else "legal_requests"
+    )
+
+
 def seed_legal_requests(
     repository: LegalRequestRepository,
     audit_service: AuditService,
     mock_data_dir: Path = MOCK_DATA_DIR,
+    dataset: str = "full",
 ) -> int:
-    """Seed all scenario fixtures; returns the number newly created."""
+    """Seed the active dataset's fixtures; returns the number newly created."""
     created = 0
-    for path in sorted((mock_data_dir / "legal_requests").glob("*.json")):
+    for path in sorted(fixtures_dir(mock_data_dir, dataset).glob("*.json")):
         fixture = json.loads(path.read_text())
         legal_request_id = fixture["legal_request_id"]
         if repository.get(legal_request_id) is not None:
