@@ -21,6 +21,7 @@ from app.services.deficiency_service import DeficiencyService
 from app.services.governance_metrics_service import GovernanceMetricsService
 from app.services.request_extraction_service import RequestExtractionService
 from app.services.sensitive_special_handling_service import SensitiveSpecialHandlingService
+from app.services.sop_retrieval_service import LocalSopRetrievalService
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,7 @@ class Container:
             mock_dir / "sop" / "special_handling_rules.json"
         )
         self.deficiency_service = DeficiencyService(mock_dir / "sop" / "deficiency_rules.json")
+        self.retrieval_service = LocalSopRetrievalService(mock_dir)
         self.governance_service = GovernanceMetricsService(
             self.legal_request_repository,
             self.audit_repository,

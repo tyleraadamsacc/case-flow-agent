@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from app.api.deps import Container
 from app.api.routes.agent_runs import router as agent_runs_router
 from app.api.routes.audit import router as audit_router
+from app.api.routes.evidence import router as evidence_router
 from app.api.routes.governance import router as governance_router
 from app.api.routes.health import router as health_router
 from app.api.routes.legal_requests import router as legal_requests_router
@@ -46,6 +47,7 @@ def create_app(
     app.include_router(agent_runs_router)
     app.include_router(production_package_router)
     app.include_router(audit_router)
+    app.include_router(evidence_router)
     app.include_router(governance_router)
 
     @app.middleware("http")
