@@ -30,11 +30,11 @@ LERS request intake → request extraction → indexing → triage/classificatio
 5. **Text Content Agent** — drafts the response package, deficiency response, SME notification, or production summary.
 6. **Automation Agent** — prepares (never executes) route, escalation, assignment, QA sampling, or follow-up actions.
 
-Each agent will exist as a named backend module with typed input/output schemas, will appear by official RFP name in a **Six-Agent Workflow Rail** in the UI, will produce a structured `AgentRun` record returned by the API, will write an inspectable audit event, and will be counted in a governance **Agent Activity / RFP Agent Coverage** module.
+**Each agent is implemented as a named Google ADK agent** (Agent Development Kit), orchestrated by a `CaseFlowRootAgent` (ADK `Workflow` graph over the rail order). **ADK owns the six-agent execution layer; FastAPI remains the application backend** for APIs, repositories, approval policy, audit service, governance metrics, and UI data contracts — ADK has no final legal workflow authority. Each agent has typed input/output schemas, appears by official RFP name in a **Six-Agent Workflow Rail** in the UI, produces a structured `AgentRun` record persisted by the FastAPI layer and returned by the API, writes an inspectable audit event, and is counted in a governance **Agent Activity / RFP Agent Coverage** module. ADK session state is an execution scratchpad only; the local repository (later Firestore) remains the source of truth. One ADK constraint to know: ADK requires agent `name`s to be valid identifiers, so the ADK name is the snake_case agent id (e.g. `note_taking_and_data_entry_agent`) while the exact official RFP display name is carried on the agent and used verbatim across UI, audit, and governance.
 
 **Why deterministic/local-first first:** The handoff docs (05, 06, 12, 14) are explicit: the deterministic workflow must pass before Gemini is added. Building deterministic agents against mock data first means (a) the workflow state machine, approval policy, and audit trail are testable to 100% pass rates with no flaky LLM behavior; (b) the app runs locally with zero GCP credentials, which is a hard requirement; (c) the six-agent visibility requirement can be demoed early and reliably; and (d) Gemini becomes a swap-in behind already-validated schemas, so structured-output failures degrade to the deterministic path plus human review rather than breaking the demo.
 
-**How GCP/Gemini integrate later:** Every external dependency sits behind an adapter interface from day one — `ModelClient` (mock → Gemini via `google-genai`), `RetrievalService` (local JSON corpus → Agent Search / Vertex AI Search), repositories (local JSON → Firestore), storage (local files → Cloud Storage), auth (mock local user → IAP/Workspace identity). Model IDs are config-driven through a `ModelRouter`; no agent or route handler ever calls Gemini directly. Cloud Run deployment is prepared at the end (Dockerfile, env split) without breaking local mode.
+**How GCP/Gemini integrate later:** Every external dependency sits behind an adapter or framework seam from day one — the six agents are deterministic ADK `BaseAgent` implementations first and swap to Gemini-backed ADK `LlmAgent` behavior later (config-driven model names, never hardcoded); `RetrievalService` (local JSON corpus → Agent Search / Vertex AI Search), repositories (local JSON → Firestore), storage (local files → Cloud Storage), auth (mock local user → IAP/Workspace identity). Non-agent services that need Gemini (extraction, QA, insights) go through a single `google-genai` wrapper. No route handler ever calls Gemini directly. Cloud Run deployment is prepared at the end (Dockerfile, env split) without breaking local mode.
 
 **Synthetic data only.** All requests, agencies, identifiers, records, and people are synthetic. The UI labels everything mock/synthetic. No production write-back adapters exist in the MVP at all.
 
@@ -119,23 +119,25 @@ These are enforced **in code** (approval policy, state machine, QA/guardrail ser
 19. Use config-driven model routing; no hardcoded model IDs; no direct Gemini calls from route handlers.
 20. Commit no secrets; local env via `.env.local` (gitignored).
 
+**ADK boundary (added with the ADK-first direction):** Google ADK owns six-agent *execution* only. The FastAPI application layer remains the authority for workflow state, approval policy, audit, and persistence. ADK session state is an execution scratchpad; `AgentRun` records persisted in the repository are the source of truth. Neither any ADK agent nor the `CaseFlowRootAgent` can finalize route, response package, production, release, or send actions — those transitions exist only behind code-enforced human approval in the FastAPI layer. ETL remains mock-only and the Automation Agent prepares actions without executing them, regardless of execution framework.
+
 ---
 
 ## 5. Recommended implementation strategy
 
 Staged, local-first, deterministic-first. Each phase produces something runnable and testable; Gemini and GCP come last because the docs require the deterministic workflow to pass before adding them, and because the demo's credibility depends on the state machine, approval gates, and audit trail — not on live model calls.
 
-**Phase → PR mapping (updated per reviewer direction):** Phase 0 ships alone as **PR 0** (application skeleton only — no domain code). Phase 1 ships as **PR 1** (deterministic backend foundation). Phase 2 plus the agent-facing parts of Phase 3 ship as **PR 2** (six-agent workflow and `AgentRun` visibility). See §18–§19 for the full split.
+**Phase → PR mapping (updated for the ADK-first direction):** Phase 0 ships as **PR 0** (repo + ADK scaffold: app skeleton plus `google-adk`, the `adk_agents/` package, a placeholder `CaseFlowRootAgent`, six placeholder ADK agents with official RFP names, and an ADK smoke test — no Gemini, no business workflow). Phase 1 ships as **PR 1** (domain model + state + audit foundation). Phase 2 plus the agent-facing parts of Phase 3 ship as **PR 2** (six-agent deterministic **ADK** workflow and `AgentRun` visibility). See §18–§19 for the full split.
 
 | Phase | Goal | Main tasks | Deliverables | Dependencies | Done when |
 |---|---|---|---|---|---|
-| **Phase 0 — Confirm repo baseline and create skeleton** | A working empty project, dev tooling, and (optionally) Story Capture reuse findings | `git init` + first commit of docs/plan; create `backend/` Python project (FastAPI, Pydantic v2, pytest, ruff) with `pyproject.toml`; `frontend/` Vite + React + TypeScript scaffold; `Makefile` (`make dev`, `make test`, `make test-unit`, `make test-api`, `make test-golden`); `.gitignore` + `.env.local.example`; structured logging config; *optional input:* run the Story Capture reuse analysis per doc 15 | Repo skeleton, Makefile, CI-less local test runner, README stub | None | `make test` runs (even if trivially), `uvicorn` serves `/healthz`, `npm run dev` serves a placeholder page, no credentials needed |
+| **Phase 0 — Repo baseline + ADK scaffold** | A working project skeleton with the ADK execution layer stubbed in | `git init` + first commit of docs/plan; `backend/` Python project (FastAPI, pytest, ruff) with `pyproject.toml` incl. `google-adk`; `app/adk_agents/` package with `registry.py` (agent ids ↔ official RFP names), placeholder `CaseFlowRootAgent` (ADK `Workflow` graph), and six placeholder ADK agents; ADK smoke test (all six instantiate, official names exact, root agent executes all six credential-free); `frontend/` Vite + React + TypeScript shell; `Makefile`; `.gitignore` + `.env.local.example`; *optional input:* Story Capture reuse analysis per doc 15 | Repo skeleton, ADK agent scaffold, Makefile, test runner, README | None | `make test` green incl. ADK smoke test, `uvicorn` serves `/healthz`, `npm run dev` serves a placeholder page, zero credentials |
 | **Phase 1 — Deterministic backend workflow** | Core domain: models, state machine, approval policy, audit service, repositories | All Pydantic models (§8); `WorkflowStateMachine` with the doc-06 state list and legal transitions; `ApprovalPolicy` (doc-06 trigger list); `AuditService` + `LocalJsonAuditRepository`; `LocalJsonLegalRequestRepository`; `RequestExtractionService` (deterministic: reads pre-extracted mock fields); deficiency/validation service; routes for queue/detail/extract/classify/validate/review/audit | Typed domain layer + first API routes + unit tests | Phase 0 | A request can move `request_received → … → analyst_review_pending` via API with every transition writing an audit event; invalid transitions rejected; tests pass |
-| **Phase 2 — Six-agent service layer** | The six RFP agents as named, typed, deterministic workflow actors | `agents/` package with one module per agent; shared `AgentRun` envelope; `CaseFlowOrchestrator` running the rail sequence Indexing → Triaging → ETL → Note/Data → Text Content → Automation; per-agent audit events; `GET /api/legal-requests/{id}/agent-runs`; agent-runs included on request detail | Six agent modules, orchestrator, agent-run API, agent contract tests | Phase 1 | Scenario A produces six `AgentRun` records with official names, structured outputs, confidences, evidence IDs, and six audit events; blocked agents (ETL in B/C/D) appear as `blocked` runs with reasons |
+| **Phase 2 — Six-agent deterministic ADK workflow** | The six RFP agents as named ADK agents with deterministic behavior, bridged to persisted `AgentRun` records | Implement deterministic `_run_async_impl` for each ADK agent; `CaseFlowRootAgent` runs the rail sequence Indexing → Triaging → ETL → Note/Data → Text Content → Automation via the ADK Runner; `agent_execution_service.py` bridges ADK events/session state to persisted `AgentRun` records + per-agent audit events (session state = scratchpad only); `GET /api/legal-requests/{id}/agent-runs`; agent-runs included on request detail; `GET /api/governance/agent-activity` | Six deterministic ADK agents, root-agent execution path, agent-run API, agent contract tests | Phase 1 | Scenario A produces six `AgentRun` records with official names, structured outputs, confidences, evidence IDs, and six audit events; blocked agents (ETL in B/C/D) appear as `blocked` runs with reasons; no ADK path can finalize anything |
 | **Phase 3 — Mock data and golden scenarios** | Credible synthetic dataset and deterministic golden tests | Six scenario JSON files (doc 03 layout); mock GPS records (8 for A, 0 for F); SOP/routing/deficiency/response-template/special-handling rule files; sensitive party registry; product/domain taxonomy; mock data loader seeding repositories at startup; golden scenario test suite (12 scenarios from doc 12) | `mock_data/` tree, seed loader, `make test-golden` green | Phases 1–2 | All 12 golden scenarios pass deterministically; Scenario A end-to-end via API includes all six agents; extraction ignores placeholder text |
 | **Phase 4 — Frontend workflow UI** | Analyst-facing request lifecycle screens | React SPA: Request Queue, Request Detail (two-column source + extracted fields), **Six-Agent Workflow Rail** (hard requirement), Response Package Draft, Deficiency Response Draft, Human Review (approve/changes/escalate/QA), shared agent-card component; API client; mock-data banners | Working SPA against local backend | Phases 1–3 | A user can run Scenario A start-to-finish in the browser, see all six agent cards with status/output/audit links, and approve the package; Scenario B shows the deficiency path; Scenario C shows escalation |
 | **Phase 5 — Governance and audit views** | Leadership-facing visibility | Governance summary/product-volume/processing-time/bottlenecks/agent-activity/work-needing-attention/audit-readiness endpoints + `GovernanceMetricsService`; Governance & Insights screen with **Agent Activity / RFP Agent Coverage** module; Work Needing Attention screen; Audit Timeline (filterable by agent) and Audit Detail screens | Governance API + 4 screens | Phases 1–4 | Governance shows volume/AHT/SLA/deficiency/escalation/override/audit-coverage metrics with data-confidence labels; agent coverage shows runs/blocked/audit-events for all six agents; audit timeline filters by agent name |
-| **Phase 6 — Gemini integration** | Real model behind validated schemas | `GeminiClient` wrapper over `google-genai`; `ModelRouter` (task → model from config); `PromptLoader` + versioned prompt files; structured output validation with one repair retry then block + human review; `MockModelClient` for tests; wire extraction, triage, note drafting, response/deficiency drafting, QA validation, governance insights to model mode behind a config flag | Model layer + prompts + Gemini-mode integration tests (mock-model in CI) | Phases 1–3 (UI not required) | With `MODEL_MODE=gemini` and a key, drafts come from Gemini and still validate; with no key, deterministic mode unchanged; no model IDs in agent files; no model calls in route handlers; invalid outputs blocked + audited |
+| **Phase 6 — Gemini-backed ADK behavior** | Real model behind validated schemas, through ADK | Swap applicable agents (Triaging, Note Taking and Data Entry, Text Content; optionally Indexing and extraction) to Gemini-backed ADK `LlmAgent` implementations with structured `output_schema` validation; `ModelRouter` (task → model name from config, fed into ADK agents — never hardcoded); versioned instruction/prompt files; one repair retry then block + human review with deterministic fallback; `google-genai` wrapper for non-agent services (extraction, QA validation, governance insights); mock model mode for tests | Gemini-mode ADK agents + prompts + integration tests (mock-model in CI) | Phases 1–3 (UI not required) | With `MODEL_MODE=gemini` and a key, drafts come from Gemini and still validate; with no key, deterministic mode unchanged; no model IDs in agent files; no model calls in route handlers; invalid outputs blocked + audited; ETL and Automation remain deterministic |
 | **Phase 7 — GCP adapters and deployment path** | Cloud Run-ready, swappable persistence | Dockerfile (multi-stage, serves SPA + API); env/config split (local vs GCP mode); Firestore repository skeletons; Cloud Storage repository skeleton; Agent Search retrieval adapter skeleton; IAP/auth plan notes; structured logs verified to include request ID/agent/model/prompt version/evidence/confidence/latency/outcome | Container build, adapter skeletons, deployment notes | Phases 1–6 | `docker build` succeeds; container runs in local mode with zero credentials; no secrets committed; switching adapters is config-only |
 | **Phase 8 — Demo polish** | Leadership demo readiness | Demo seed script (reset + load scenarios); demo walkthrough doc with the six-agent talk track; UI polish on the rail and governance coverage module; "where are the six agents in 10 seconds" check; synthetic-data labeling sweep; final DoD checklist run | Demo script, polish, DoD sign-off | All prior | A presenter can run the doc-13 leadership acceptance test: click one request and show all six agents' input, output, review requirement, and audit event |
 
@@ -186,17 +188,19 @@ CaseFlow/
         human_review.py  approval_decision.py  audit_event.py
         workflow_state.py  governance_metric.py  agent_run.py  evidence.py
       orchestration/
-        caseflow_orchestrator.py
         workflow_state_machine.py
         approval_policy.py
-      agents/
-        base.py                  # AgentRun envelope helpers, audit emission, names registry
+        agent_execution_service.py   # runs CaseFlowRootAgent via ADK Runner; persists AgentRuns + audit
+      adk_agents/                    # Google ADK execution layer — the six RFP agents
+        registry.py                  # agent ids ↔ official RFP display names (single source of truth)
+        base.py                      # CaseFlowAgent(BaseAgent): display_name + shared run behavior
         indexing_agent.py
         triaging_agent.py
         etl_agent.py
-        note_data_entry_agent.py
+        note_taking_and_data_entry_agent.py
         text_content_agent.py
         automation_agent.py
+        root_agent.py                # CaseFlowRootAgent (ADK Workflow graph over the six, rail order)
       services/
         request_extraction_service.py
         sensitive_special_handling_service.py
@@ -319,14 +323,16 @@ CaseFlow/
 | `app/models/*` (24 files) | Typed Pydantic domain models — see §8 | — | 1 |
 | `app/orchestration/workflow_state_machine.py` | Encodes the doc-06 state list and legal transitions; rejects invalid transitions; every transition emits an audit event | models, audit service | 1 |
 | `app/orchestration/approval_policy.py` | Pure-code policy: given request + agent outputs, returns `human_review_required` + reasons from the doc-06 trigger list; consulted before any approve/finalize transition | models | 1 |
-| `app/orchestration/caseflow_orchestrator.py` | Runs the six-agent rail in sequence for a request; records `AgentRun` per agent (incl. `blocked` runs with reasons, e.g., ETL blocked on deficiency); never auto-approves | agents, state machine, approval policy, audit | 2 |
-| `app/agents/base.py` | Agent protocol: `run(input) -> AgentRun`; registry of official names/IDs; helpers that stamp `agent_id`, `agent_name`, `schema_version`, audit metadata and write the audit event | models, audit service | 2 |
-| `app/agents/indexing_agent.py` | Indexing Agent (see §10) | base, SOP retrieval | 2 |
-| `app/agents/triaging_agent.py` | Triaging Agent (see §10) | base, routing rules, special handling service | 2 |
-| `app/agents/etl_agent.py` | ETL Agent (see §10) | base, response record repo | 2 |
-| `app/agents/note_data_entry_agent.py` | Note Taking and Data Entry Agent (see §10) | base | 2 |
-| `app/agents/text_content_agent.py` | Text Content Agent (see §10) | base, response package service | 2 |
-| `app/agents/automation_agent.py` | Automation Agent (see §10) | base, approval policy | 2 |
+| `app/adk_agents/root_agent.py` | `CaseFlowRootAgent` (ADK `Workflow` graph) orchestrating the six ADK agents in rail order; placeholder in PR 0, deterministic workflow in PR 2; writes per-agent results to ADK session state (scratchpad only) | adk_agents, `google-adk` | 0 (placeholder), 2 |
+| `app/orchestration/agent_execution_service.py` | FastAPI-side bridge: creates the ADK session, runs `CaseFlowRootAgent` (or a single agent) via the ADK Runner, translates events/session state into persisted `AgentRun` records (incl. `blocked` runs with reasons), writes audit events, enforces policy blocks; never auto-approves | adk_agents, state machine, approval policy, audit | 2 |
+| `app/adk_agents/registry.py` | Single source of truth: snake_case agent ids ↔ official RFP display names (exact spelling), rail order | — | 0 |
+| `app/adk_agents/base.py` | `CaseFlowAgent(BaseAgent)`: shared ADK base carrying `display_name`; helpers that stamp `agent_id`, `agent_name`, `schema_version`, audit metadata onto outputs | models, audit service, `google-adk` | 0 (shell), 2 |
+| `app/adk_agents/indexing_agent.py` | Indexing Agent (see §10) | base, SOP retrieval | 2 |
+| `app/adk_agents/triaging_agent.py` | Triaging Agent (see §10) | base, routing rules, special handling service | 2 |
+| `app/adk_agents/etl_agent.py` | ETL Agent (see §10) | base, response record repo | 2 |
+| `app/adk_agents/note_taking_and_data_entry_agent.py` | Note Taking and Data Entry Agent (see §10) | base | 2 |
+| `app/adk_agents/text_content_agent.py` | Text Content Agent (see §10) | base, response package service | 2 |
+| `app/adk_agents/automation_agent.py` | Automation Agent (see §10) | base, approval policy | 2 |
 | `app/services/request_extraction_service.py` | Deterministic MVP: loads pre-extracted fields from scenario JSON and filters placeholder text; Phase 6: Gemini-backed extraction validated to schema | repos; later llm/ | 1, 6 |
 | `app/services/sensitive_special_handling_service.py` | Deterministic detection of sealed/non-disclosure/no-adverse-action/pen-register/trap-and-trace/ongoing-access/location/content/tombstone flags; emits `special_handling_checked` audit event | models, audit | 1 |
 | `app/services/deficiency_service.py` | Applies `deficiency_rules.json`: missing date range, missing identifier, overbroad scope → typed `DeficiencyFinding`s | mock rules | 1 |
@@ -424,15 +430,17 @@ All under `/api` except health. Every `POST` that changes state writes audit eve
 
 ## 10. Six-agent implementation plan
 
-Common contract for **all six agents** (enforced by `agents/base.py` and contract tests):
+Common contract for **all six agents** (enforced by `adk_agents/base.py`, `adk_agents/registry.py`, and contract tests). **They are Google ADK agents, not plain Python service classes behind a custom orchestrator:**
 
-- Implemented as a named class in its own module under `app/agents/`.
-- `run(input) -> AgentRun` where `AgentRun.output` is the agent's typed payload.
+- Implemented as a named ADK agent class (subclassing ADK `BaseAgent`; Gemini-applicable agents move to `LlmAgent`-backed implementations in Phase 6) in its own module under `app/adk_agents/`, orchestrated by `CaseFlowRootAgent` (ADK `Workflow` graph in rail order).
+- ADK requires identifier `name`s, so each agent's ADK name is its snake_case id (`indexing_agent`, …, `note_taking_and_data_entry_agent`); the **exact official RFP display name** is carried on the agent (`display_name`) and in the registry, and is what the UI, audit timeline, and governance surfaces show.
+- Deterministic MVP behavior lives in the agent's `_run_async_impl`, which reads request context, writes its structured output payload into ADK session state (scratchpad), and yields ADK events.
+- The FastAPI-side `agent_execution_service` runs the agents via the ADK Runner and converts each agent's output into a persisted `AgentRun` record — `AgentRun.output` is the agent's typed payload; the repository, not ADK session state, is the source of truth.
 - Every output stamps: `agent_id`, official `agent_name` (exact RFP spelling), `schema_version`, `confidence`, `rationale`, `evidence_ids`, `requires_human_review`, `risk_flags`, and audit metadata.
 - Every run (including blocked runs) writes exactly one audit event and stores `audit_event_id` on the run.
-- Deterministic mode is the default; Gemini mode is opt-in per task via `ModelRouter` (Phase 6) — and ETL and Automation remain deterministic even then.
-- Failure behavior: exceptions/validation failures produce `status: "failed"` or `"blocked"` runs with a reason, still audited; the orchestrator continues to the next non-dependent step or halts per policy — it never silently skips an agent.
-- No agent can transition the workflow into an approved/final state.
+- Deterministic mode is the default; Gemini mode is opt-in per task via config-driven model routing (Phase 6) — and ETL and Automation remain deterministic even then.
+- Failure behavior: exceptions/validation failures produce `status: "failed"` or `"blocked"` runs with a reason, still audited; the rail continues to the next non-dependent step or halts per policy — it never silently skips an agent.
+- No agent — and not the `CaseFlowRootAgent` — can transition the workflow into an approved/final state; finalization exists only behind code-enforced human approval in the FastAPI layer.
 
 ### Indexing Agent
 
@@ -516,12 +524,12 @@ Common contract for **all six agents** (enforced by `agents/base.py` and contrac
 
 | Agent | Backend module | UI component | Main output | Audit event | Scenario coverage |
 |---|---|---|---|---|---|
-| Indexing Agent | `app/agents/indexing_agent.py` | Rail card #1 (`AgentRunCard` in `SixAgentWorkflowRail`) | `IndexingOutput` (labels, domains, priority, SOP matches) | `request_indexed` | A–F (multi-domain showcase: D) |
-| Triaging Agent | `app/agents/triaging_agent.py` | Rail card #2 | `ClassificationResult` + `RoutingRecommendation` | `request_classified` (+ `route_recommended`) | A–F (risk showcase: C; overbroad: D) |
-| ETL Agent | `app/agents/etl_agent.py` | Rail card #3 | `EtlOutput` + mock `ResponsiveRecord[]` | `etl_simulated` | A (8 records), F (0); blocked in B/C/D; optional E |
-| Note Taking and Data Entry Agent | `app/agents/note_data_entry_agent.py` | Rail card #4 | `NoteDraft` + fields_to_update | `note_drafted` | A–F |
-| Text Content Agent | `app/agents/text_content_agent.py` | Rail card #5 + Response Package / Deficiency screens | `TextDraft` / `ProductionPackage` draft | `production_package_drafted` / `deficiency_response_drafted` | A (package), B (deficiency), C (SME notice), D (clarification), F (no-records) |
-| Automation Agent | `app/agents/automation_agent.py` | Rail card #6 + Human Review action context | `AutomationOutput` (prepared action) | `workflow_action_prepared` | A–F (escalation showcase: C) |
+| Indexing Agent | `app/adk_agents/indexing_agent.py` | Rail card #1 (`AgentRunCard` in `SixAgentWorkflowRail`) | `IndexingOutput` (labels, domains, priority, SOP matches) | `request_indexed` | A–F (multi-domain showcase: D) |
+| Triaging Agent | `app/adk_agents/triaging_agent.py` | Rail card #2 | `ClassificationResult` + `RoutingRecommendation` | `request_classified` (+ `route_recommended`) | A–F (risk showcase: C; overbroad: D) |
+| ETL Agent | `app/adk_agents/etl_agent.py` | Rail card #3 | `EtlOutput` + mock `ResponsiveRecord[]` | `etl_simulated` | A (8 records), F (0); blocked in B/C/D; optional E |
+| Note Taking and Data Entry Agent | `app/adk_agents/note_taking_and_data_entry_agent.py` | Rail card #4 | `NoteDraft` + fields_to_update | `note_drafted` | A–F |
+| Text Content Agent | `app/adk_agents/text_content_agent.py` | Rail card #5 + Response Package / Deficiency screens | `TextDraft` / `ProductionPackage` draft | `production_package_drafted` / `deficiency_response_drafted` | A (package), B (deficiency), C (SME notice), D (clarification), F (no-records) |
+| Automation Agent | `app/adk_agents/automation_agent.py` | Rail card #6 + Human Review action context | `AutomationOutput` (prepared action) | `workflow_action_prepared` | A–F (escalation showcase: C) |
 
 ---
 
@@ -531,7 +539,8 @@ These are required for safety and workflow control but are **not** presented as 
 
 | Service | Purpose | MVP behavior | Future behavior |
 |---|---|---|---|
-| **CaseFlow Orchestrator** | Runs the six-agent rail in order, owns sequencing/blocking, collects `AgentRun`s; never approves anything | Deterministic in-process sequence Indexing → Triaging → ETL → Note/Data → Text Content → Automation, with per-step policy checks and blocked-step recording | Unchanged in design; could later run steps via Cloud Tasks/queues — explicitly **not** replaced by Agent Search (doc 04 guardrail) |
+| **CaseFlowRootAgent (ADK)** | ADK `Workflow` graph that runs the six-agent rail in order inside the ADK runtime; never approves anything | Placeholder in PR 0; in PR 2 runs the deterministic agents Indexing → Triaging → ETL → Note/Data → Text Content → Automation with per-step blocking recorded in session state | Gemini-backed sub-agents swap in at Phase 6; execution remains authority-free — finalization stays in the FastAPI layer |
+| **Agent Execution Service** | FastAPI-side bridge between the application and ADK: creates sessions, invokes the ADK Runner, persists `AgentRun`s, writes audit events, applies policy blocks | Deterministic, in-process; treats ADK session state as scratchpad and the local repository as source of truth | Same contract over Firestore-backed repositories; could later run via Cloud Tasks/queues — explicitly **not** replaced by Agent Search (doc 04 guardrail) |
 | **Request Extraction Service** | Turns the request document into structured fields; filters placeholder/instruction text | Reads pre-extracted fields from scenario JSON; a placeholder filter strips "PLEASE DELETE"/"YOUR NAME HERE" patterns to satisfy the doc-02 assertion | Gemini-backed extraction (`request_extraction.md`) with schema validation, `source_span`s for UI highlighting, deficiency findings emitted inline |
 | **Sensitive / Special Handling Checker** | Detects sealed, non-disclosure, no-adverse-action, pen register, trap-and-trace, ongoing-access, location/content/tombstone flags | Deterministic over extracted `SpecialHandlingFlags`; writes `special_handling_checked`; feeds review reasons to Triaging and the approval policy | Stays deterministic (safety-critical); may add registry lookups (sensitive party registry) for golden scenario 7 |
 | **QA / Guardrail Service** | Validates missing fields, disclosure risk, unsupported claims, missing approvals, audit completeness; blocks finalization | Deterministic checks before any approve/finalize transition; writes `qa_validation_completed` or `finalization_blocked`; the "missing audit event blocks finalization" rule lives here | Optional Gemini-assisted QA pass (`qa_guardrail.md`) **in addition to**, never instead of, the deterministic checks |
@@ -541,8 +550,8 @@ These are required for safety and workflow control but are **not** presented as 
 | **Workflow State Machine** | Legal state transitions only | Doc-06 state list; transition table rejects anything else; every transition writes an audit event; deficiency branch supported | Unchanged; persisted state moves to Firestore behind the repository interface |
 | **Local Retrieval Service** | Evidence retrieval over the local corpus (SOPs, rules, templates, taxonomy, registry) | Keyword/key-based lookup over `mock_data/` returning `EvidenceReference`s with stable IDs | `AgentSearchRetrievalService` over Vertex AI Search / Agent Search data store (`gs://caseflow-grounding/`), same interface |
 | **Mock Response Record Service** | Serves synthetic responsive records | Filters scenario record files by identifier/period; labels `synthetic_mock` | None in prototype; a real `ApprovedDataSourceAdapter` is future-production-only and intentionally absent from the codebase |
-| **Gemini Client wrapper** | Single owner of `google-genai` calls | Not present until Phase 6; `MockModelClient` stands in for tests | `GeminiClient` with timeouts, retries, model-metadata logging (model ID, prompt version, latency, outcome) |
-| **Model Router** | Maps task → model from config | Returns `deterministic`/`mock` handlers in MVP | Maps the seven doc-04 tasks to env-configured Gemini models; no model IDs in agent code |
+| **Gemini Client wrapper** | Single owner of direct `google-genai` calls for **non-agent** services (extraction, QA validation, governance insights); agent Gemini usage goes through ADK `LlmAgent` instead | Not present until Phase 6; mock model stands in for tests | `GeminiClient` with timeouts, retries, model-metadata logging (model ID, prompt version, latency, outcome) |
+| **Model Router** | Maps task → model name from config, consumed by both ADK `LlmAgent` construction and the genai wrapper | Returns `deterministic`/`mock` handlers in MVP | Maps the seven doc-04 tasks to env-configured Gemini model names; no model IDs in agent code |
 
 ---
 
@@ -679,10 +688,13 @@ An item is generated when any of these hold, with the reason(s) attached and a l
 
 Added only after the deterministic workflow and golden tests are green (Phase 6). Gemini supports extraction, classification, drafting, validation, and insight generation; it **never** owns workflow state or approvals, and its output is always advisory/draft.
 
+**ADK-first split:** Gemini reaches the six agents **through ADK** — applicable agents (Triaging, Note Taking and Data Entry, Text Content; optionally Indexing) swap their deterministic `BaseAgent` implementation for an ADK `LlmAgent`-backed one with structured `output_schema` validation, model name supplied by the `ModelRouter` from config. Non-agent services (Request Extraction, QA validation, Governance Insights) use the single `google-genai` wrapper. ETL and Automation never get Gemini behavior.
+
 **Components:**
 
-- **`GeminiClient`** (`app/llm/gemini_client.py`) — the single wrapper over `google-genai`. Owns auth, timeouts, retries, safety settings, and response parsing. No other module imports `google-genai`. Route handlers never call it; agents/services receive a `ModelClient` via DI.
-- **`ModelRouter`** (`app/llm/model_router.py`) — maps task name → model from config/env. Tasks: `request_extraction`, `triage_classification`, `note_drafting`, `response_package_drafting`, `deficiency_response_drafting`, `qa_validation`, `governance_insights`. No hardcoded model IDs anywhere; per-task overrides via env (e.g., `MODEL__TRIAGE_CLASSIFICATION=...`).
+- **Gemini-backed ADK agents** (`app/adk_agents/*`) — `LlmAgent`-based implementations behind the same agent ids/display names and the same `AgentRun` contract; switching `MODEL_MODE` swaps implementation, not interface. ADK handles the underlying `google-genai` calls for agents.
+- **`GeminiClient`** (`app/llm/gemini_client.py`) — the single wrapper over `google-genai` for non-agent services. Owns auth, timeouts, retries, safety settings, and response parsing. Route handlers never call it; services receive it via DI.
+- **`ModelRouter`** (`app/llm/model_router.py`) — maps task name → model name from config/env, consumed by both ADK `LlmAgent` construction and the wrapper. Tasks: `request_extraction`, `triage_classification`, `note_drafting`, `response_package_drafting`, `deficiency_response_drafting`, `qa_validation`, `governance_insights`. No hardcoded model IDs anywhere; per-task overrides via env (e.g., `MODEL__TRIAGE_CLASSIFICATION=...`).
 - **`PromptLoader`** (`app/llm/prompt_loader.py`) — loads versioned prompt files from `app/prompts/caseflow/` with front-matter (`version`, `task`, `output_schema`); prompt version is logged with every call and stamped on `AgentRun.prompt_version`.
 - **Structured output validation** (`app/llm/output_validation.py`) — every model response is parsed and validated against the target Pydantic schema (`IndexingOutput`, `ClassificationResult`, `NoteDraft`, `TextDraft`/package, QA result, insight).
 - **Repair/retry path** — on validation failure: (1) one repair call with the validation errors appended; (2) if still invalid, return a **blocked** result; (3) mark `requires_human_review: true`; (4) write an audit event recording the failure. The deterministic output (where one exists) remains available as fallback so the demo never dead-ends.
@@ -743,7 +755,8 @@ Targets from doc 12: 100% on extraction/classification/package schema validity, 
 | **API tests** | `backend/tests/api/` | Every §9 endpoint via `httpx` TestClient: health; queue; detail (incl. `agent_runs`); extract/index/classify/validate/route; ETL simulate; notes/package/deficiency drafts; review/approve/escalate/send-to-qa; audit timeline + global query with `?agent=` filter; governance endpoints; invalid state transition → 409; unauthorized finalization → blocked |
 | **Golden scenario tests** | `backend/tests/golden/` | The 12 doc-12 scenarios run end-to-end through the orchestrator + API against seeded mock data: (1) GPS happy path, (2) missing date range, (3) pen register/TT + non-disclosure, (4) overbroad, (5) subscriber info, (6) no responsive records, (7) regulator/sensitive sender, (8) low-confidence classification, (9) SOP conflict, (10) missing audit event blocks finalization, (11) human route override, (12) response package edited by analyst |
 | **Guardrail tests** | `backend/tests/golden/` + dedicated module | No autonomous send/release path exists (assert no such route is registered — scan the FastAPI route table for forbidden names/verbs); production package cannot reach an approved state without an `ApprovalDecision`; deficiency response cannot be approved without human review; ETL reads only from `mock_data/`; every draft status is non-final; missing audit event → `finalization_blocked` |
-| **Agent contract tests** | `backend/tests/unit/agents/` | Parametrized over all six agents: returns a valid `AgentRun`; output validates against the agent's schema; includes `agent_id`, `agent_name` (exact official RFP spelling), `status`, `output_summary`, `audit_event_id`; writes exactly one audit event per run; blocked/failed runs are audited; no agent registered under a generic name (`ai_agent` etc. asserted absent) |
+| **ADK smoke/execution tests** | `backend/tests/unit/adk_agents/` | All six ADK agents and the `CaseFlowRootAgent` instantiate; ADK ids and official RFP display names exact; root agent has the six sub-agents in rail order; root agent executes end-to-end through the ADK Runner with zero credentials, emitting events from all six agents |
+| **Agent contract tests** | `backend/tests/unit/adk_agents/` | Parametrized over all six ADK agents: execution yields a valid persisted `AgentRun`; output validates against the agent's schema; includes `agent_id`, `agent_name` (exact official RFP spelling), `status`, `output_summary`, `audit_event_id`; writes exactly one audit event per run; blocked/failed runs are audited; no agent registered under a generic name (`ai_agent` etc. asserted absent); `AgentRun` content sourced from the repository, not read back from ADK session state |
 | **UI / e2e tests** | `frontend/tests/` | Vitest component tests: `SixAgentWorkflowRail` renders all six cards with official names; `AgentRunCard` shows status/output/confidence/audit link; approval banner states. Playwright e2e (Phase 4–5): run Scenario A in the browser; click evidence to reveal rationale; click audit link to open the timeline entry; governance shows the RFP Agent Coverage module |
 | **Gemini integration tests (later)** | `backend/tests/llm/` | Mock-model tests for the repair/retry/block path (valid, invalid-then-repaired, invalid-twice → blocked + audited); prompt loader versioning; model router config resolution; opt-in live tests behind `GEMINI_INTEGRATION_TESTS=1`, never in default `make test` |
 
@@ -759,42 +772,46 @@ Targets from doc 12: 100% on extraction/classification/package schema validity, 
 8. Extraction ignores placeholder/instruction text.
 9. Scenario A ETL returns 8 records; Scenario F returns 0; all ETL output labeled `synthetic_mock`.
 10. Governance summary exposes agent-activity counts for all six agents.
+11. The six agents execute as ADK agents under `CaseFlowRootAgent` (not plain service classes); the ADK smoke test passes with zero credentials.
+12. Persisted `AgentRun` records in the repository are the source of truth — no API response is served from ADK session state.
 
 ---
 
 ## 18. First PR scope
 
-> **Sequencing update (2026-06-10, per reviewer direction):** the repo is not scaffolded yet, so the application skeleton ships alone as **PR 0** before any domain code. The previously combined first PR is split: **PR 1** delivers the deterministic backend foundation, **PR 2** adds the six-agent deterministic workflow and `AgentRun` visibility. Doc 14's "first PR" six-agent acceptance criteria are therefore satisfied at the end of **PR 2**; the PR 0–2 sequence together still meets every doc-14 item.
+> **Sequencing update (2026-06-10, per reviewer direction):** the application skeleton ships alone as **PR 0**, **PR 1** delivers the domain/state/audit foundation, and **PR 2** adds the six-agent deterministic workflow and `AgentRun` visibility. Doc 14's "first PR" six-agent acceptance criteria are therefore satisfied at the end of **PR 2**; the PR 0–2 sequence together still meets every doc-14 item.
+>
+> **ADK-first revision (2026-06-10, per reviewer direction):** CaseFlow is ADK-first for agent execution. The six RFP agents are implemented as **named Google ADK agents** orchestrated by a `CaseFlowRootAgent` — not plain Python service classes behind a custom orchestrator. FastAPI remains the application backend (APIs, repositories, approval policy, audit service, governance metrics, UI data contracts); ADK owns agent execution only and has no final legal workflow authority. PR 0 therefore includes the ADK scaffold.
 
-### PR 0 — application skeleton and local developer foundation (the actual first PR)
+### PR 0 — repo + ADK scaffold (the actual first PR)
 
-**PR title:** `chore: application skeleton — FastAPI backend, React/Vite/TS frontend shell, Makefile, test setup`
+**PR title:** `chore: application skeleton + ADK scaffold — FastAPI backend, six placeholder ADK agents, CaseFlowRootAgent, frontend shell`
 
-Skeleton only — no domain models, agents, mock scenarios, audit logic, approval policy, state machine, governance, Gemini, or GCP adapters.
+Skeleton plus ADK execution-layer stubs — no Gemini, no business workflow, no GCP credentials, no frontend screens, no domain models, no audit logic.
 
 **Include:**
 
 - `git init` (baseline commit of handoff docs + this plan on `main`; scaffold work on a feature branch).
-- `README.md` — project overview, guardrail statement, quickstart, repo layout, roadmap pointer.
-- `.gitignore` — Python, Node, env files, OS/editor artifacts.
-- `.env.local.example` — documented env vars; **zero credentials required**; Gemini/GCP vars present only as commented future placeholders.
-- `Makefile` — `install`, `dev-backend`, `dev-frontend`, `test`, `test-unit`, `test-api`, `lint`, `build-frontend` (`test-golden` is added in PR 2 when the first golden tests exist).
-- `backend/` Python project: `pyproject.toml` (FastAPI + uvicorn; dev extras: pytest, httpx, ruff), `app/main.py` app factory, `app/api/routes/health.py` with `GET /healthz`, pytest setup (`tests/conftest.py`, `tests/api/test_health.py`, `tests/unit/test_app_factory.py`).
-- `frontend/` React + Vite + TypeScript app shell (React confirmed — empty repo, fastest prototype path, no Angular house standard) with a placeholder page showing the synthetic-data banner and a backend health indicator; dev-server proxy to the backend.
+- `README.md`, `.gitignore`, `.env.local.example` (zero credentials; Gemini/GCP vars only as commented future placeholders), `Makefile` (`install`, `dev-backend`, `dev-frontend`, `test`, `test-unit`, `test-api`, `lint`, `build-frontend`; `test-golden` arrives in PR 2).
+- `backend/` Python project: `pyproject.toml` with FastAPI + uvicorn + **`google-adk`** (dev extras: pytest, httpx, ruff), `app/main.py` app factory, `app/api/routes/health.py` with `GET /healthz`, pytest setup.
+- **`app/adk_agents/` package:** `registry.py` (snake_case agent ids ↔ exact official RFP display names, rail order — single source of truth); `base.py` (`CaseFlowAgent(BaseAgent)` with `display_name` and a placeholder `_run_async_impl`); six placeholder ADK agents — `IndexingAgent`, `TriagingAgent`, `EtlAgent`, `NoteTakingAndDataEntryAgent`, `TextContentAgent`, `AutomationAgent`; `root_agent.py` with `CaseFlowRootAgent` (ADK `Workflow` graph over the six in rail order).
+- **ADK smoke test:** all six agents instantiate as ADK agents; official RFP names present and exact; root agent carries the six sub-agents in rail order; root agent executes end-to-end through the ADK Runner with zero credentials, emitting events from all six agents.
+- `frontend/` React + Vite + TypeScript app shell with a placeholder page (synthetic-data banner, backend health indicator) and dev-server proxy — shell only, no screens.
 
 **Acceptance criteria:**
 
-- `make install && make test` passes locally.
-- `make dev-backend` serves `GET /healthz`; `make dev-frontend` serves the placeholder page; both run together locally.
-- Zero GCP credentials; no secrets committed; `.env.local` gitignored.
+- `make install && make test` passes locally, including the ADK smoke test, with zero GCP credentials.
+- `make dev-backend` serves `GET /healthz`; `make dev-frontend` serves the placeholder page.
+- The six official RFP agent names appear exactly in the ADK registry and on the agents.
+- No secrets committed; `.env.local` gitignored; no Gemini usage anywhere.
 
-**Excluded:** everything domain-specific (deferred to PR 1+).
+**Excluded:** Gemini behavior, business workflow, domain models, audit logic, mock scenarios, GCP adapters, frontend screens.
 
-### PR 1 — deterministic backend foundation
+### PR 1 — domain model + state + audit foundation
 
-**PR title:** `feat: deterministic backend foundation — domain models, workflow state machine, approval policy, audit trail, mock request data`
+**PR title:** `feat: domain model, workflow state machine, approval policy, audit trail, local repositories, mock request data`
 
-**Files/modules:** `config.py` (pydantic-settings), `logging_config.py`, `api/deps.py`; all §8 models **except `AgentRun`** (which lands in PR 2 with the agents); `WorkflowStateMachine`; `ApprovalPolicy` (full doc-06 trigger list); `AuditService` + local audit repository; local repositories (legal request, response record, storage); `RequestExtractionService` (deterministic + placeholder-text filter); sensitive/special handling checker; deficiency service; mock data: six legal-request scenario fixtures (A–F), `sop/` rule files (intake, routing, deficiency, special handling, response package), `registries/` (taxonomy, sensitive party), `seed.py` loader.
+**Files/modules:** `config.py` (pydantic-settings), `logging_config.py`, `api/deps.py`; all §8 models **except `AgentRun`** (which lands in PR 2 with the agent workflow); `WorkflowStateMachine`; `ApprovalPolicy` (full doc-06 trigger list); `AuditService` + local audit repository; local repositories (legal request, response record, storage); `RequestExtractionService` (deterministic + placeholder-text filter); sensitive/special handling checker; deficiency service; mock data loader: six legal-request scenario fixtures (A–F), `sop/` rule files (intake, routing, deficiency, special handling, response package), `registries/` (taxonomy, sensitive party), `seed.py`.
 
 **Endpoints:** `GET /api/legal-requests`; `POST /api/legal-requests`; `GET /api/legal-requests/{id}`; `POST .../extract`; `POST .../validate`; `POST .../review`; `POST .../approve`; `POST .../escalate`; `POST .../send-to-qa`; `GET .../audit`; `GET /api/audit/events`; `GET /api/governance/summary` (basic counts — agent activity arrives in PR 2).
 
@@ -802,15 +819,15 @@ Skeleton only — no domain models, agents, mock scenarios, audit logic, approva
 
 **Acceptance criteria:** a seeded request can move `request_received → … → analyst_review_pending → analyst_approved / escalated` via the API with a complete audit trail; all approval-policy triggers enforced in code; `make test` green with zero credentials; no unsafe endpoint names.
 
-### PR 2 — six-agent deterministic workflow and AgentRun visibility
+### PR 2 — six-agent deterministic ADK workflow
 
-**PR title:** `feat: six RFP agents as named workflow actors with AgentRun outputs, orchestrator, and agent-activity counts`
+**PR title:** `feat: deterministic ADK workflow — six RFP agents produce AgentRun records via CaseFlowRootAgent, with audit events and agent-activity counts`
 
-**Files/modules:** `AgentRun` model; `agents/base.py` + the six agent modules (deterministic implementations, not stubs — each returns real structured output for the seeded scenarios); `CaseFlowOrchestrator` (rail sequence with blocked-step recording); routing rules service; local SOP retrieval wiring for evidence IDs; response record service; response package service; mock `response_records/` files (exactly 8 GPS records for A, empty for F) and per-scenario `agent_runs` expectation blocks.
+**Files/modules:** `AgentRun` model; deterministic `_run_async_impl` implementations for the six ADK agents (real structured output for the seeded scenarios, written to ADK session state as scratchpad); `CaseFlowRootAgent` execution path (rail sequence with blocked-step recording for deficiency/escalation scenarios); `orchestration/agent_execution_service.py` (creates ADK sessions, runs the Runner, persists `AgentRun` records to the repository — the source of truth — and writes one audit event per run); routing rules service; local SOP retrieval wiring for evidence IDs; response record service; response package service; mock `response_records/` files (exactly 8 GPS records for A, empty for F) and per-scenario `agent_runs` expectation blocks.
 
 **Endpoints:** `POST .../index`; `POST .../classify`; `POST .../route-recommendation`; `POST .../etl/simulate`; `GET .../responsive-records`; `POST .../notes/draft`; `POST .../production-package/draft`; `GET .../production-package`; `POST .../deficiency-response/draft`; `POST .../agents/run`; `GET .../agent-runs`; `GET /api/governance/agent-activity`; request detail response gains `agent_runs`.
 
-**Tests:** six-agent contract tests (valid `AgentRun`, exact official RFP names, structured output, exactly one audit event per run including blocked runs, no generic `ai_agent` naming); golden scenarios 1–6 core assertions (A: all six agents complete; B: ETL blocked on deficiency; C: Automation Agent prepares SME escalation; F: ETL returns zero records and Text Content drafts the no-records package); guardrail route-table scan (no send/release endpoints); `make test-golden` target added.
+**Tests:** six-agent contract tests over the ADK execution path (valid persisted `AgentRun`, exact official RFP names, structured output, exactly one audit event per run including blocked runs, no generic `ai_agent` naming, API responses served from the repository rather than ADK session state); golden scenarios 1–6 core assertions (A: all six agents complete end-to-end through `CaseFlowRootAgent`; B: ETL blocked on deficiency; C: Automation Agent prepares SME escalation; F: ETL returns zero records and Text Content drafts the no-records package); guardrail tests (route-table scan for send/release endpoints; no ADK path reaches an approved/final state); `make test-golden` target added.
 
 **Acceptance criteria (doc-14 six-agent criteria land here):** `agent_runs` object on request detail; Scenario A produces six agent run records; each agent run writes an audit event; governance exposes agent-activity counts; tests confirm all six official RFP agent names exactly; production package draft-only with human approval required.
 
@@ -818,19 +835,19 @@ Skeleton only — no domain models, agents, mock scenarios, audit logic, approva
 
 ## 19. Later PR roadmap
 
-Sequence updated per reviewer direction: PR 0 (skeleton) → PR 1 (deterministic backend foundation) → PR 2 (six-agent workflow + `AgentRun` visibility), then the remaining work renumbered accordingly.
+Sequence updated per reviewer direction (ADK-first): PR 0 (repo + ADK scaffold) → PR 1 (domain model + state + audit foundation) → PR 2 (six-agent deterministic ADK workflow), then the remaining work renumbered accordingly.
 
 | PR | Goal | Main changes | Acceptance criteria |
 |---|---|---|---|
-| **PR 0** | Application skeleton and local developer foundation (see §18) | §18 PR 0 | §18 PR 0 criteria |
-| **PR 1** | Deterministic backend foundation (see §18) | §18 PR 1 | §18 PR 1 criteria |
-| **PR 2** | Six-agent deterministic workflow + AgentRun visibility (see §18) | §18 PR 2 | §18 PR 2 criteria (incl. doc-14 six-agent criteria) |
+| **PR 0** | Repo + ADK scaffold (see §18) | §18 PR 0 | §18 PR 0 criteria |
+| **PR 1** | Domain model + state + audit foundation (see §18) | §18 PR 1 | §18 PR 1 criteria |
+| **PR 2** | Six-agent deterministic ADK workflow (see §18) | §18 PR 2 | §18 PR 2 criteria (incl. doc-14 six-agent criteria) |
 | **PR 3** | Six-agent depth: full golden suite + agent-run polish | Golden scenarios 7–9, 11–12 (sensitive sender, low confidence, SOP conflict, route override, analyst package edits); sensitive party registry wiring; human-override capture on reviews; `AgentRun` retry/latency fields populated; orchestrator blocked-step refinements | All 12 golden scenarios green; override metrics computable; blocked ETL runs visible in B/C/D fixtures |
 | **PR 4** | Response package and deficiency flow completion | `section_provenance` on packages; no-records package variant; SME notification draft; chain-of-custody/certification draft polish; QA guardrail completeness checks; `qa_validation_completed`/`finalization_blocked` paths hardened | Package matches Template LERS Response exactly; F variant correct; finalization blocked without QA pass + approval + complete audit trail |
 | **PR 5** | Governance and audit endpoints (full) | Product-volume, processing-time, bottlenecks, audit-readiness, response-package-status endpoints; governance metrics service with data-confidence labels; deterministic insight generation; global audit query with agent filter | All §9 governance endpoints live; metrics labeled; `?agent=` filter returns each agent's events |
 | **PR 6** | Frontend request workflow | API client + types over the PR 0 shell; Request Queue, Request Detail (source + extracted fields), **Six-Agent Workflow Rail**, Response Package Draft, Deficiency Response Draft, Human Review screens; mock-data banners; UI language guardrails | Scenario A completable in browser; rail shows six named cards with status/output/audit links; B and C paths viewable; component tests pass |
 | **PR 7** | Frontend governance views | Governance & Insights with RFP Agent Coverage module; Work Needing Attention; Audit Timeline (agent filter) + Audit Detail screens | Leadership can see agent coverage within 10 seconds; attention items link to agent outputs; timeline filters by all six agents |
-| **PR 8** | Gemini wrapper and prompt profiles | `app/llm/` (GeminiClient, ModelRouter, PromptLoader, output validation, MockModelClient); prompt files; wire extraction/triage/notes/drafts/QA/insights behind `MODEL_MODE`; repair/retry/block path; model metadata logging | Mock-model tests green in CI; deterministic mode unchanged; no model IDs in agents; no model calls in routes; invalid output → blocked + audited + human review |
+| **PR 8** | Gemini-backed ADK behavior | Swap applicable ADK agents to `LlmAgent`-backed implementations with `output_schema` validation; `app/llm/` (GeminiClient wrapper for non-agent services, ModelRouter, PromptLoader, output validation, mock model mode); versioned instruction/prompt files; repair/retry/block path; model metadata logging; ETL and Automation stay deterministic | Mock-model tests green in CI; deterministic mode unchanged; no model IDs in agents; no model calls in routes; invalid output → blocked + audited + human review |
 | **PR 9** | Retrieval abstraction and local evidence hardening | `RetrievalService` interface finalized; evidence IDs threaded through all agent outputs, audit events, insights; UI evidence expanders verified; retrieval unit tests | Every classification/draft carries evidence references; evidence click-through works; Agent Search adapter can be added without touching agents |
 | **PR 10** | GCP adapters and deployment path | Dockerfile (multi-stage, SPA + API); local/GCP config split; Firestore request/audit repo skeletons; Cloud Storage repo skeleton; Agent Search retrieval skeleton; IAP/auth notes; structured-log field completion | `docker build` succeeds; container runs local mode credential-free; adapter swap is config-only; no secrets in repo |
 | **PR 11** | Demo polish | Demo seed/reset script; demo walkthrough doc with six-agent talk track; rail and coverage-module visual polish; synthetic-data labeling sweep; full DoD checklist run (§21) | Doc-13 leadership acceptance test passes live; all DoD items checked |
@@ -856,6 +873,9 @@ Sequence updated per reviewer direction: PR 0 (skeleton) → PR 1 (deterministic
 | **Doc conflict: Scenario C agent list** — doc 03 scenario table omits Text Content but lists "Governance" (not one of the six); the coverage matrix marks Text Content **Yes** for C | Scenario fixture ambiguity | **Recommendation:** follow the coverage matrix — Text Content drafts the SME notification in C; "Governance" is a control service, not a rail agent | No — recommendation stated |
 | **Story Capture reuse analysis not yet performed** (doc 15) — target repo is outside this workspace and outside this planning task's read scope | Possible duplicated effort on genai wrapper/router/prompt-loader patterns | Run the doc-15 read-only analysis before PR 8 (Gemini) at the latest; PRs 0–2 do not depend on it | **Partially** — needed before PR 8, not before PR 0–2 |
 | **Frontend framework** — docs allow React or Angular | Rework if the org standard differs | **Resolved:** reviewer approved React + Vite + TypeScript for the PR 0 shell (no Angular house standard identified) | No — resolved |
+| **ADK API churn** — `google-adk` is a fast-moving SDK; agent/runner/event APIs may shift between versions | Scaffold or tests break on upgrade | Pin a known-good version range in `pyproject.toml` (`google-adk>=2.2,<3`); keep all ADK imports inside `app/adk_agents/` + the execution service so churn is contained; ADK smoke test catches breakage immediately. Observed during PR 0: ADK 2.x deprecates `SequentialAgent`, so `CaseFlowRootAgent` is built on the `Workflow` graph API (`START → six agents` edges) instead | No |
+| **ADK name constraint vs. official RFP names** — ADK requires identifier agent names; the official names contain spaces | Leadership could perceive the official names as missing | ADK `name` = snake_case id; exact official display name carried on every agent (`display_name`) and in `registry.py`; UI/audit/governance always render the official name; tests assert exact spelling | No — designed-in |
+| **ADK session state misuse** — session state could drift into being treated as the system of record | Source-of-truth ambiguity, audit gaps | Hard rule in plan + tests: session state is execution scratchpad only; `AgentRun`s persisted via repositories are the source of truth; API never serves from session state | No — designed-in |
 | **Open product questions** (doc 01): highest-volume request types; product segmentation priority; AHT reduction assumptions; "draft package only" vs "approved production package with synthetic records" display | Demo emphasis tuning | Defaults for prototype: emphasize Maps/Location + subscriber-info volume; show **draft package pending approval** (never "approved production" by agent — safer and guardrail-consistent); AHT figures labeled `estimated`/`synthetic_mock` | No — defaults proposed; revisit before demo |
 
 ---
@@ -887,6 +907,6 @@ Consolidated from docs 13, 14, and 16. Each item is testable.
 1. **Review this plan** — specifically the recommendations on the four documented conflicts (§20): adopt `workflow_action_prepared` in the audit taxonomy, canonicalize `GET /api/governance/agent-activity`, follow the coverage matrix for Scenario C (Text Content drafts the SME notification), and treat the v2/v3 header mismatch as cosmetic.
 2. **Frontend framework is resolved:** React + TypeScript + Vite, approved with the PR 0 direction. Remaining default to confirm before the demo: the demo shows **"draft package pending approval"** rather than any "approved production" state (proposed default, guardrail-consistent).
 3. **Optionally schedule the Story Capture reuse analysis** (doc 15) — it is read-only, lives in a different repo, and is only needed before PR 8 (Gemini wrapper/router/prompt-loader patterns). It does not block PRs 0–2.
-4. **PR 0 is in progress** (application skeleton: git init, README, .gitignore, .env.local.example, Makefile, minimal FastAPI backend with `/healthz` + test setup, React/Vite/TS frontend shell). Once merged, **PR 1** (deterministic backend foundation) starts immediately — nothing in the open-question list blocks it: the data model, state machine, approval policy, audit service, and mock scenarios are fully specified by the handoff docs. **PR 2** then adds the six agents and `AgentRun` visibility.
+4. **PR 0 is in progress** (repo + ADK scaffold: git init, README, .gitignore, .env.local.example, Makefile, minimal FastAPI backend with `/healthz` + test setup, `google-adk` dependency, `adk_agents/` package with six placeholder ADK agents + `CaseFlowRootAgent` + ADK smoke test, React/Vite/TS frontend shell). Once merged, **PR 1** (domain model + state + audit foundation) starts immediately — nothing in the open-question list blocks it. **PR 2** then delivers the six-agent deterministic ADK workflow and `AgentRun` visibility.
 
-**What the user should review:** the §18 PR 0/1/2 split (in particular that doc 14's six-agent acceptance criteria now land at the end of PR 2), the §9 endpoint naming recommendation, the §6 repo layout, and the §20 conflict recommendations.
+**What the user should review:** the ADK-first boundary (§1, §4, §10 — ADK executes agents; FastAPI keeps all finalization authority), the §18 PR 0/1/2 split (in particular that doc 14's six-agent acceptance criteria now land at the end of PR 2), the §9 endpoint naming recommendation, the §6 repo layout, and the §20 conflict recommendations.
