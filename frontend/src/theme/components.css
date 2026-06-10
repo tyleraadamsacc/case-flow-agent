@@ -1249,3 +1249,240 @@ button.cf-chip {
   flex-direction: column;
   gap: var(--space-3);
 }
+
+/* ---------- Governance ---------- */
+
+.cf-metric-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.cf-metric__value {
+  display: block;
+  font-size: var(--font-display);
+  font-weight: 500;
+  margin-bottom: var(--space-2);
+}
+
+.cf-governance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+@media (max-width: 1100px) {
+  .cf-governance-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cf-coverage {
+  display: flex;
+  flex-direction: column;
+}
+
+.cf-coverage__row {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.6fr) repeat(4, minmax(60px, 0.6fr)) minmax(170px, 1fr) minmax(70px, 0.5fr);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--surface-soft);
+  font-size: var(--font-body);
+}
+
+.cf-coverage__row:last-child {
+  border-bottom: none;
+}
+
+.cf-coverage__row--head {
+  font-size: var(--font-micro);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cf-coverage__agent {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 500;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .cf-coverage__row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .cf-coverage__row--head {
+    display: none;
+  }
+
+  .cf-coverage__row > span[data-label]::before {
+    content: attr(data-label) ": ";
+    color: var(--text-muted);
+    font-size: var(--font-micro);
+  }
+}
+
+.cf-barlist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cf-barlist__item {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.9fr) minmax(0, 1.4fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--font-body);
+}
+
+.cf-barlist__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cf-barlist__track {
+  display: block;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+
+.cf-barlist__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--blue);
+  opacity: 0.75;
+  transition: width var(--motion-slow);
+}
+
+.cf-barlist__value {
+  font-size: var(--font-small);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* ---------- Attention feed ---------- */
+
+.cf-attention {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--space-4);
+}
+
+.cf-attention__card {
+  cursor: pointer;
+}
+
+.cf-attention__header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cf-attention__runs {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-small);
+  color: var(--text-secondary);
+}
+
+/* ---------- Audit timeline ---------- */
+
+.cf-toolbar--wrap {
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.cf-filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 180px;
+}
+
+select.cf-input {
+  appearance: auto;
+}
+
+.cf-timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.cf-timeline__event {
+  position: relative;
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3) 0 var(--space-3) var(--space-1);
+}
+
+.cf-timeline__event:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 26px;
+  bottom: -6px;
+  width: 2px;
+  background: var(--surface-soft);
+}
+
+.cf-timeline__dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--blue);
+  opacity: 0.7;
+}
+
+.cf-timeline__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cf-timeline__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cf-timeline__time {
+  font-size: var(--font-micro);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.cf-timeline__action {
+  font-weight: 500;
+}
+
+.cf-timeline__request {
+  font-size: var(--font-small);
+}
+
+.cf-timeline__summary {
+  margin: var(--space-1) 0 var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--font-body);
+}

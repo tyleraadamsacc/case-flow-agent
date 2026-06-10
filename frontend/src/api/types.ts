@@ -375,3 +375,72 @@ export interface ActionResponse {
   legal_request: LegalRequest;
   audit_event: AuditEvent;
 }
+
+export type DataConfidence =
+  | "fully_tracked"
+  | "partially_tracked"
+  | "estimated"
+  | "synthetic_mock"
+  | "unavailable";
+
+export interface GovernanceMetric {
+  metric_id: string;
+  title: string;
+  value: number;
+  unit: string;
+  dimension: string | null;
+  period: string | null;
+  data_confidence: DataConfidence;
+  evidence_ids: string[];
+}
+
+export interface AgentActivity {
+  agent_id: string;
+  agent_name: string;
+  runs_total: number;
+  runs_completed: number;
+  runs_blocked: number;
+  runs_needs_review: number;
+  runs_failed: number;
+  audit_events: number;
+  average_confidence: number | null;
+  requests_covered: string[];
+  data_confidence: DataConfidence;
+}
+
+export interface AttentionItem {
+  legal_request_id: string;
+  workflow_state: WorkflowState;
+  reasons: string[];
+  priority: number;
+  related_agent_run_ids: string[];
+}
+
+export interface AuditReadinessReport {
+  requests_total: number;
+  requests_with_all_required_events: number;
+  coverage_percent: number;
+  missing_events_by_request: Record<string, string[]>;
+  finalization_blocked_events: number;
+  data_confidence: DataConfidence;
+}
+
+export interface GovernanceSummaryResponse {
+  metrics: GovernanceMetric[];
+}
+
+export interface AgentActivityResponse {
+  agents: AgentActivity[];
+}
+
+export interface WorkNeedingAttentionResponse {
+  items: AttentionItem[];
+}
+
+export interface AuditEventFilters {
+  legal_request_id?: string;
+  action?: string;
+  actor_type?: string;
+  /** Snake_case agent id or the exact official RFP name. */
+  agent?: string;
+}
