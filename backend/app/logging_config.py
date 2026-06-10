@@ -26,6 +26,12 @@ class JsonFormatter(logging.Formatter):
         correlation_id = correlation_id_var.get()
         if correlation_id:
             payload["correlation_id"] = correlation_id
+        # Structured fields (GCP DoD): callers attach
+        # extra={"caseflow": {...}} — request id, agent, model, prompt
+        # version, evidence ids, confidence, latency, outcome.
+        caseflow = getattr(record, "caseflow", None)
+        if isinstance(caseflow, dict):
+            payload.update(caseflow)
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
         return json.dumps(payload)

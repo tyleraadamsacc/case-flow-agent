@@ -14,6 +14,7 @@ failing run and everything after it.
 """
 
 import asyncio
+import logging
 import hashlib
 from datetime import date
 from pathlib import Path
@@ -85,6 +86,9 @@ TEXT_DRAFT_AUDIT_ACTIONS: dict[str, AuditAction] = {
 
 APP_NAME = "caseflow"
 USER_ID = "caseflow-backend"
+
+
+logger = logging.getLogger("caseflow.agent_runs")
 
 
 class AgentExecutionService:
@@ -216,6 +220,28 @@ class AgentExecutionService:
                 input_hash=input_hash,
             )
             self._runs.save(run)
+            # Structured run log (GCP DoD): request id, agent, model,
+            # prompt version, evidence, confidence, latency, outcome.
+            logger.info(
+                "agent_run_persisted",
+                extra={
+                    "caseflow": {
+                        "legal_request_id": run.legal_request_id,
+                        "agent_run_id": run.agent_run_id,
+                        "agent_id": run.agent_id,
+                        "agent_name": run.agent_name,
+                        "status": run.status.value,
+                        "model_id": run.model_id,
+                        "prompt_version": run.prompt_version,
+                        "retry_count": run.retry_count,
+                        "validation_status": run.validation_status,
+                        "evidence_ids": run.evidence_ids,
+                        "confidence": run.confidence,
+                        "latency_ms": run.latency_ms,
+                        "audit_event_id": run.audit_event_id,
+                    }
+                },
+            )
             persisted.append(run)
             self._apply_artifacts(request, run)
         self._requests.save(request)
