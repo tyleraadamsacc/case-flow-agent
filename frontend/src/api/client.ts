@@ -173,3 +173,23 @@ export const governanceApi = {
     return http<AuditEventType[]>(`/api/audit/events${suffix}`);
   },
 };
+
+import type { EvidenceReference } from "./types";
+
+/** Evidence retrieval — read-only grounding lookups. */
+export const evidenceApi = {
+  get: (evidenceId: string) =>
+    http<EvidenceReference>(`/api/evidence/${encodeURIComponent(evidenceId)}`),
+
+  search: (params: { source_type?: string; query?: string } = {}) => {
+    const search = new URLSearchParams();
+    if (params.source_type) {
+      search.set("source_type", params.source_type);
+    }
+    if (params.query) {
+      search.set("query", params.query);
+    }
+    const suffix = search.size > 0 ? `?${search.toString()}` : "";
+    return http<EvidenceReference[]>(`/api/evidence${suffix}`);
+  },
+};

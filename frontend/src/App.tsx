@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
+import { EvidenceProvider } from "./components/evidence/EvidenceContext";
 import AuditPage from "./pages/AuditPage";
 import ComingSoonPage from "./pages/ComingSoonPage";
 import DesignSystemPreview from "./pages/DesignSystemPreview";
@@ -11,7 +12,8 @@ import WorkNeedingAttentionPage from "./pages/WorkNeedingAttentionPage";
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
+      <EvidenceProvider>
+        <Routes>
         <Route path="/" element={<Navigate to="/governance" replace />} />
         <Route path="/governance" element={<GovernanceInsightsPage />} />
         <Route path="/attention" element={<WorkNeedingAttentionPage />} />
@@ -21,7 +23,8 @@ export default function App() {
         <Route path="/settings" element={<ComingSoonPage title="Settings" />} />
         <Route path="/design-system" element={<DesignSystemPreview />} />
         <Route path="*" element={<Navigate to="/governance" replace />} />
-      </Routes>
+        </Routes>
+      </EvidenceProvider>
     </BrowserRouter>
   );
 }
