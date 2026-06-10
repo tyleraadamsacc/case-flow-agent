@@ -28,7 +28,13 @@ const FORBIDDEN_PHRASES = [
 ];
 
 const SOURCE_FILES = import.meta.glob(
-  ["../components/**/*.tsx", "../theme/*.ts", "../pages/**/*.tsx"],
+  [
+    "../components/**/*.tsx",
+    "../theme/*.ts",
+    "../pages/**/*.tsx",
+    "../lib/*.ts",
+    "../api/*.ts",
+  ],
   { eager: true, query: "?raw", import: "default" },
 ) as Record<string, string>;
 

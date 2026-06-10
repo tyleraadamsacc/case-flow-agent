@@ -57,11 +57,57 @@ export const STATUS_META: Record<WorkflowStatusKey, StatusMeta> = {
   synthetic_mock: { label: "Synthetic / mock data", tone: "violet" },
 };
 
+/** Backend WorkflowState values → display meta. Drafted/intermediate
+ * states read blue (work in progress), human-decision states read amber,
+ * completed states green. */
+export const WORKFLOW_STATE_META: Record<string, StatusMeta> = {
+  request_received: { label: "Received", tone: "neutral" },
+  request_extracted: { label: "Extracted", tone: "blue" },
+  request_indexed: { label: "Indexed", tone: "blue" },
+  request_classified: { label: "Classified", tone: "blue" },
+  request_validated: { label: "Validated", tone: "blue" },
+  route_recommended: { label: "Route recommended", tone: "blue" },
+  etl_simulated: { label: "ETL simulated", tone: "blue" },
+  note_drafted: { label: "Note drafted", tone: "blue" },
+  response_package_drafted: { label: "Package drafted", tone: "blue" },
+  deficiency_response_drafted: {
+    label: "Deficiency response drafted",
+    tone: "blue",
+  },
+  analyst_review_pending: { label: "Analyst review pending", tone: "amber" },
+  analyst_approved: { label: "Analyst approved", tone: "green" },
+  escalated: { label: "Escalated", tone: "amber" },
+  sent_to_qa: { label: "Sent to QA", tone: "blue" },
+  changes_requested: { label: "Changes requested", tone: "amber" },
+  audit_complete: { label: "Audit complete", tone: "green" },
+};
+
+/** Pending-human literals the backend stamps on drafted artifacts. Every
+ * one reads blue (a draft in flight) or amber (a person must decide) —
+ * there is no agent-final status to map. */
+export const DRAFT_STATUS_META: Record<string, StatusMeta> = {
+  draft_not_final: { label: "Draft — not final", tone: "blue" },
+  draft_pending_approval: { label: "Draft pending approval", tone: "blue" },
+  draft_pending_analyst_review: {
+    label: "Draft pending analyst review",
+    tone: "blue",
+  },
+  recommended_pending_human: {
+    label: "Recommended — pending human",
+    tone: "blue",
+  },
+  prepared_pending_human: { label: "Prepared — pending human", tone: "blue" },
+  approved_by_analyst: { label: "Approved by analyst", tone: "green" },
+};
+
 /** Resolve a status string to display meta. Unknown statuses degrade to a
  * neutral badge with a humanized label rather than crashing — future
  * backend statuses must never break the UI. */
 export function statusMeta(status: string): StatusMeta {
-  const known = STATUS_META[status as WorkflowStatusKey];
+  const known =
+    STATUS_META[status as WorkflowStatusKey] ??
+    WORKFLOW_STATE_META[status] ??
+    DRAFT_STATUS_META[status];
   if (known) {
     return known;
   }
