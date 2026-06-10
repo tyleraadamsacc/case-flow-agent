@@ -1,0 +1,133 @@
+/* CaseFlow design tokens — Gemini-inspired legal operations console.
+   Single source of truth for color, type, shape, elevation, and motion.
+   See frontend/UI_THEME_AND_GEMINI_UX_GUIDE.md for usage rules. */
+
+:root {
+  /* Surfaces — soft neutral canvas, never pure-white everywhere, never dark. */
+  --background-app: #f7f9fc;
+  --surface-card: #ffffff;
+  --surface-soft: #f1f4f9;
+  --surface-tint-blue: #eef4ff;
+  --surface-track: #d8deea;
+  --border-subtle: #e0e5ef;
+
+  /* Text */
+  --text-primary: #202124;
+  --text-secondary: #5f6368;
+  --text-muted: #80868b;
+  --text-on-color: #ffffff;
+
+  /* Primary palette — color carries meaning, not decoration. */
+  --blue: #1a73e8;
+  --blue-soft: #e8f0fe;
+  --violet: #7c4dff;
+  --violet-soft: #f0eafe;
+  --cyan: #00acc1;
+  --cyan-soft: #e6f7fa;
+  --green: #188038;
+  --green-soft: #e6f4ea;
+  --yellow: #f9ab00;
+  --yellow-soft: #fef7e0;
+  --red: #d93025;
+  --red-soft: #fce8e6;
+
+  /* Gemini gradient — accents only: running agents, primary action glow,
+     insight cards, subtle header marks. Never flood surfaces with it. */
+  --gemini-gradient: linear-gradient(135deg, #1a73e8 0%, #7c4dff 48%, #00acc1 100%);
+  --gemini-soft-gradient: linear-gradient(
+    135deg,
+    rgba(26, 115, 232, 0.14),
+    rgba(124, 77, 255, 0.12),
+    rgba(0, 172, 193, 0.1)
+  );
+
+  /* Shape — rounded, soft, professional. */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+  --radius-card: 20px;
+
+  /* Elevation — subtle, never heavy. */
+  --shadow-card: 0 1px 2px rgba(60, 64, 67, 0.08), 0 8px 24px rgba(60, 64, 67, 0.06);
+  --shadow-card-hover: 0 2px 4px rgba(60, 64, 67, 0.1), 0 12px 32px rgba(60, 64, 67, 0.1);
+  --shadow-bar: 0 1px 2px rgba(60, 64, 67, 0.06);
+
+  /* Typography — Google-like fallback stack; no proprietary font files. */
+  --font-family: "Google Sans", "Inter", "Roboto", Arial, sans-serif;
+  --font-display: 32px;
+  --font-title: 24px;
+  --font-section: 18px;
+  --font-body: 14px;
+  --font-small: 12px;
+  --font-micro: 11px;
+
+  /* Spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Motion — sparing, gentle. */
+  --motion-fast: 120ms ease;
+  --motion-standard: 200ms ease;
+  --motion-slow: 320ms ease;
+
+  /* Focus — visible ring everywhere, on every interactive element. */
+  --focus-ring: 0 0 0 2px var(--surface-card), 0 0 0 4px var(--blue);
+}
+
+html {
+  box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+body {
+  margin: 0;
+  background: var(--background-app);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+a {
+  color: var(--blue);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* State must never be communicated by color alone; motion must be optional. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
