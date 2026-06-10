@@ -1,5 +1,6 @@
 from datetime import date
 
+from app.models.agent_run import AgentRun
 from app.models.approval_decision import ApprovalDecision
 from app.models.base import CaseFlowModel
 from app.models.deficiency_finding import DeficiencyFinding
@@ -18,7 +19,9 @@ class LegalRequest(CaseFlowModel):
     """Root aggregate for one LERS-style legal request (synthetic only).
 
     Persisted via the legal request repository — the source of truth for
-    workflow state. ``agent_runs`` are added in PR 2.
+    workflow state. ``agent_runs`` (latest run per agent, keyed by agent
+    id) is hydrated from the agent-run repository at the API boundary;
+    the agent-run repository remains the source of truth for runs.
     """
 
     schema_version: str = "1.0"
@@ -37,6 +40,7 @@ class LegalRequest(CaseFlowModel):
     deficiency_findings: list[DeficiencyFinding] = []
     reviews: list[HumanReview] = []
     approvals: list[ApprovalDecision] = []
+    agent_runs: dict[str, AgentRun] = {}
     owner: str | None = None
     urgency_tier: str | None = None
     raw_source_uri: str | None = None

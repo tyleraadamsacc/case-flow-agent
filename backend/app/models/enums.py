@@ -35,6 +35,18 @@ class AuditAction(StrEnum):
     AUDIT_COMPLETED = "audit_completed"
 
 
+class AgentRunStatus(StrEnum):
+    """Status of one agent execution. Blocked runs stay visible — an agent
+    that cannot proceed reports why instead of disappearing."""
+
+    WAITING = "waiting"
+    RUNNING = "running"
+    COMPLETE = "complete"
+    BLOCKED = "blocked"
+    NEEDS_REVIEW = "needs_review"
+    FAILED = "failed"
+
+
 class LegalProcessType(StrEnum):
     SEARCH_WARRANT = "search_warrant"
     EX_PARTE_ORDER = "ex_parte_order"

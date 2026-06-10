@@ -10,6 +10,7 @@ from app.mock_data.seed import seed_legal_requests
 from app.models.enums import ActorType
 from app.orchestration.approval_policy import ApprovalPolicy
 from app.orchestration.workflow_state_machine import WorkflowStateMachine
+from app.repositories.local_agent_run_repository import LocalAgentRunRepository
 from app.repositories.local_audit_repository import LocalAuditRepository
 from app.repositories.local_legal_request_repository import LocalLegalRequestRepository
 from app.repositories.local_response_record_repository import LocalResponseRecordRepository
@@ -37,6 +38,7 @@ class Container:
 
         self.legal_request_repository = LocalLegalRequestRepository()
         self.audit_repository = LocalAuditRepository()
+        self.agent_run_repository = LocalAgentRunRepository()
         self.response_record_repository = LocalResponseRecordRepository(
             mock_dir / "response_records"
         )
