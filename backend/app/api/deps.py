@@ -54,7 +54,10 @@ class Container:
         )
         self.deficiency_service = DeficiencyService(mock_dir / "sop" / "deficiency_rules.json")
         self.governance_service = GovernanceMetricsService(
-            self.legal_request_repository, self.audit_repository, self.approval_policy
+            self.legal_request_repository,
+            self.audit_repository,
+            self.approval_policy,
+            self.agent_run_repository,
         )
         self.agent_execution_service = AgentExecutionService(
             self.legal_request_repository,

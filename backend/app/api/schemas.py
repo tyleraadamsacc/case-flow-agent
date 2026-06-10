@@ -16,6 +16,7 @@ from app.models.legal_request import LegalRequest
 from app.models.production_package import ProductionPackage
 from app.models.text_draft import TextDraft
 from app.orchestration.approval_policy import ApprovalPolicyResult
+from app.services.governance_metrics_service import AgentActivity, AttentionItem
 from app.services.sensitive_special_handling_service import SpecialHandlingCheck
 
 
@@ -82,6 +83,16 @@ class ActionResponse(CaseFlowModel):
 
 class GovernanceSummaryResponse(CaseFlowModel):
     metrics: list[GovernanceMetric]
+
+
+class AgentActivityResponse(CaseFlowModel):
+    """RFP Agent Coverage: all six agents by exact official name."""
+
+    agents: list[AgentActivity]
+
+
+class WorkNeedingAttentionResponse(CaseFlowModel):
+    items: list[AttentionItem]
 
 
 class RailRunResponse(CaseFlowModel):

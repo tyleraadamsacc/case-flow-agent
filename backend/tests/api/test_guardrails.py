@@ -28,6 +28,8 @@ def test_explicitly_forbidden_endpoints_do_not_exist(app):
 def test_agent_visibility_endpoints_exist(app):
     paths = all_route_paths(app)
     assert "/api/legal-requests/{legal_request_id}/agent-runs" in paths
+    assert "/api/legal-requests/{legal_request_id}/agents/run" in paths
+    assert "/api/governance/agent-activity" in paths
 
 
 def test_no_production_write_back_adapters_exist():
