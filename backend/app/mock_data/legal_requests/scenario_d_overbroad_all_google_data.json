@@ -1,0 +1,134 @@
+{
+  "legal_request_id": "LER-2026-004842",
+  "scenario": "D",
+  "source_type": "lers_request_template",
+  "date_received": "2026-06-04",
+  "raw_source_uri": "local://legal_requests/scenario_d_overbroad_all_google_data.json",
+  "raw_source_text": "SEARCH WARRANT — [INSTRUCTIONS — PLEASE DELETE] To: Google LLC, Google Legal Investigations Support (LERS). The affiant requests ALL records associated with account user.synthetic.d@example.com including but not limited to: subscriber information, all sent/received/deleted/stored emails and attachments, web and app activity, YouTube search and watch history, all files in Drive/Docs/Sheets/Slides, all photos and videos and metadata, Google Voice call detail records and SMS/MMS and voicemail, all payment methods and purchase history, and the tombstone archive of deleted account data, between the dates of 2026-01-01 and 2026-06-01. SYNTHETIC DATA — NOT A REAL LEGAL DOCUMENT.",
+  "extracted_fields": {
+    "legal_process": {
+      "type": "search_warrant",
+      "court_order_included": true,
+      "ex_parte_order": false,
+      "pen_register": false,
+      "trap_and_trace": false,
+      "location_tracking": false,
+      "stored_communications": true
+    },
+    "requesting_agency": {
+      "agency": "Harris County Constable Digital Crimes Unit (Synthetic)",
+      "case_number": "MC-26-40917",
+      "officer": "Sergeant Alicia Park",
+      "contact_email": "synthetic.digitalcrimes@example.gov",
+      "phone": "555-0104"
+    },
+    "subject_identifiers": [
+      {
+        "type": "gmail_account",
+        "value": "user.synthetic.d@example.com",
+        "confidence": 0.99,
+        "source_span": "account user.synthetic.d@example.com"
+      }
+    ],
+    "requested_data_categories": [
+      {
+        "category": "Subscriber Information",
+        "product_domain": "Account / Subscriber",
+        "sensitivity": "medium",
+        "content_type": "subscriber",
+        "requires_sme_review": false
+      },
+      {
+        "category": "Email Contents",
+        "product_domain": "Gmail",
+        "sensitivity": "high",
+        "content_type": "content",
+        "requires_sme_review": true
+      },
+      {
+        "category": "Web and App Activity",
+        "product_domain": "Android",
+        "sensitivity": "high",
+        "content_type": "activity",
+        "requires_sme_review": true
+      },
+      {
+        "category": "YouTube Search and Watch History",
+        "product_domain": "YouTube",
+        "sensitivity": "high",
+        "content_type": "activity",
+        "requires_sme_review": true
+      },
+      {
+        "category": "Drive / Docs / Sheets / Slides Files",
+        "product_domain": "Drive / Docs / Sheets / Slides",
+        "sensitivity": "high",
+        "content_type": "content",
+        "requires_sme_review": true
+      },
+      {
+        "category": "Photos and Videos",
+        "product_domain": "Photos / Videos",
+        "sensitivity": "high",
+        "content_type": "content",
+        "requires_sme_review": true
+      },
+      {
+        "category": "Google Voice Call Records, SMS/MMS, Voicemail",
+        "product_domain": "Google Voice",
+        "sensitivity": "high",
+        "content_type": "content",
+        "requires_sme_review": true
+      },
+      {
+        "category": "Payment Methods and Purchase History",
+        "product_domain": "Pay / Payments",
+        "sensitivity": "high",
+        "content_type": "financial",
+        "requires_sme_review": true
+      },
+      {
+        "category": "Tombstone Archive",
+        "product_domain": "Tombstone archive",
+        "sensitivity": "high",
+        "content_type": "deleted_account_data",
+        "requires_sme_review": true
+      }
+    ],
+    "product_domains": [
+      "Account / Subscriber",
+      "Gmail",
+      "Android",
+      "YouTube",
+      "Drive / Docs / Sheets / Slides",
+      "Photos / Videos",
+      "Google Voice",
+      "Pay / Payments",
+      "Tombstone archive"
+    ],
+    "requested_period": {
+      "start": "2026-01-01T00:00:00Z",
+      "end": "2026-06-01T23:59:59Z"
+    },
+    "special_handling": {
+      "sealed": false,
+      "non_disclosure_to_subscriber": false,
+      "no_adverse_action": false,
+      "pen_register_requested": false,
+      "trap_and_trace_requested": false,
+      "ongoing_access_requested": false,
+      "location_tracking_requested": false,
+      "content_requested": true,
+      "tombstone_requested": true,
+      "production_deadline_days": 35,
+      "service_deadline_days": 14
+    },
+    "legal_authorities": [
+      {
+        "citation": "18 U.S.C. §2703",
+        "description": "Stored Communications Act",
+        "source_span": "pursuant to 18 U.S.C. §2703"
+      }
+    ]
+  }
+}

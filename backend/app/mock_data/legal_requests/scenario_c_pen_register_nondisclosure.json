@@ -1,0 +1,74 @@
+{
+  "legal_request_id": "LER-2026-004835",
+  "scenario": "C",
+  "source_type": "lers_request_template",
+  "date_received": "2026-06-03",
+  "raw_source_uri": "local://legal_requests/scenario_c_pen_register_nondisclosure.json",
+  "raw_source_text": "EX PARTE COURT ORDER — PEN REGISTER / TRAP AND TRACE. [INSTRUCTIONS — PLEASE DELETE] To: Google LLC, Google Legal Investigations Support (LERS). Authorizing installation and use of a pen register and trap and trace device on account user.synthetic.c@example.com for a period of 60 days or until the investigation is complete, with ongoing access once every 15 minutes, pursuant to 18 U.S.C. §§3122 and 3123. Google LLC shall not disclose the existence of this order to the subscriber for a period of one year. No adverse action shall be taken against the account. THIS ORDER IS SEALED. SYNTHETIC DATA — NOT A REAL LEGAL DOCUMENT.",
+  "extracted_fields": {
+    "legal_process": {
+      "type": "ex_parte_order",
+      "court_order_included": true,
+      "ex_parte_order": true,
+      "pen_register": true,
+      "trap_and_trace": true,
+      "location_tracking": false,
+      "stored_communications": false
+    },
+    "requesting_agency": {
+      "agency": "Cook County State's Attorney Investigations Bureau (Synthetic)",
+      "case_number": "MC-26-31044",
+      "officer": "Investigator Daniel Reyes",
+      "contact_email": "synthetic.bureau@example.gov",
+      "phone": "555-0103"
+    },
+    "subject_identifiers": [
+      {
+        "type": "gmail_account",
+        "value": "user.synthetic.c@example.com",
+        "confidence": 0.99,
+        "source_span": "account user.synthetic.c@example.com"
+      }
+    ],
+    "requested_data_categories": [
+      {
+        "category": "Dialing / Routing / Addressing / Signaling Information",
+        "product_domain": "Account / Subscriber",
+        "sensitivity": "high",
+        "content_type": "non_content_metadata",
+        "requires_sme_review": true
+      }
+    ],
+    "product_domains": ["Account / Subscriber"],
+    "requested_period": {
+      "start": "2026-06-03T00:00:00Z",
+      "end": "2026-08-02T23:59:59Z"
+    },
+    "special_handling": {
+      "sealed": true,
+      "non_disclosure_to_subscriber": true,
+      "no_adverse_action": true,
+      "pen_register_requested": true,
+      "trap_and_trace_requested": true,
+      "ongoing_access_requested": true,
+      "location_tracking_requested": false,
+      "content_requested": false,
+      "tombstone_requested": false,
+      "production_deadline_days": null,
+      "service_deadline_days": 14,
+      "nondisclosure_period": "one_year"
+    },
+    "legal_authorities": [
+      {
+        "citation": "18 U.S.C. §§3122 and 3123",
+        "description": "Pen register and trap and trace authorization",
+        "source_span": "pursuant to 18 U.S.C. §§3122 and 3123"
+      },
+      {
+        "citation": "C.R.S. §16-3-303.5",
+        "description": "State pen register / trap and trace provision (synthetic citation use)",
+        "source_span": null
+      }
+    ]
+  }
+}

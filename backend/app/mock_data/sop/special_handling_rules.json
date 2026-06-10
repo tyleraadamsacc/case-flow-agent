@@ -1,0 +1,58 @@
+{
+  "rules": [
+    {
+      "flag": "sealed",
+      "review_reason": "sealed_order_requested",
+      "evidence_id": "SH-SEALED",
+      "description": "Sealed matters require analyst/SME review before any action."
+    },
+    {
+      "flag": "non_disclosure_to_subscriber",
+      "review_reason": "non_disclosure_requested",
+      "evidence_id": "SH-NON-DISCLOSURE",
+      "description": "Non-disclosure orders require analyst/SME review."
+    },
+    {
+      "flag": "no_adverse_action",
+      "review_reason": "no_adverse_action_requested",
+      "evidence_id": "SH-NO-ADVERSE-ACTION",
+      "description": "No-adverse-action orders require analyst/SME review."
+    },
+    {
+      "flag": "pen_register_requested",
+      "review_reason": "pen_register_requested",
+      "evidence_id": "SH-PEN-REGISTER",
+      "description": "Pen register requests always require SME review."
+    },
+    {
+      "flag": "trap_and_trace_requested",
+      "review_reason": "trap_and_trace_requested",
+      "evidence_id": "SH-TRAP-AND-TRACE",
+      "description": "Trap and trace requests always require SME review."
+    },
+    {
+      "flag": "ongoing_access_requested",
+      "review_reason": "pen_register_requested",
+      "evidence_id": "SH-ONGOING-ACCESS",
+      "description": "Ongoing access cadence is handled under the pen register review path."
+    },
+    {
+      "flag": "location_tracking_requested",
+      "review_reason": "location_tracking_requested",
+      "evidence_id": "SH-LOCATION-TRACKING",
+      "description": "Location tracking requests require analyst review."
+    },
+    {
+      "flag": "content_requested",
+      "review_reason": "content_requested",
+      "evidence_id": "SH-CONTENT",
+      "description": "Content requests require analyst review."
+    },
+    {
+      "flag": "tombstone_requested",
+      "review_reason": "tombstone_requested",
+      "evidence_id": "SH-TOMBSTONE",
+      "description": "Tombstone archive requests require SME review."
+    }
+  ]
+}

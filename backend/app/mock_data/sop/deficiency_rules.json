@@ -1,0 +1,45 @@
+{
+  "overbroad_domain_threshold": 3,
+  "rules": [
+    {
+      "code": "missing_date_range",
+      "severity": "blocking",
+      "message": "Requested period is missing or incomplete.",
+      "requires_human_review": true,
+      "suggested_resolution": "Request clarification from the requesting agency.",
+      "evidence_id": "DEF-MISSING-DATE-RANGE"
+    },
+    {
+      "code": "invalid_date_range",
+      "severity": "blocking",
+      "message": "Requested period is invalid (missing bound or start after end).",
+      "requires_human_review": true,
+      "suggested_resolution": "Request a corrected date range from the requesting agency.",
+      "evidence_id": "DEF-INVALID-DATE-RANGE"
+    },
+    {
+      "code": "missing_identifier",
+      "severity": "blocking",
+      "message": "No usable subject identifier was extracted from the request.",
+      "requires_human_review": true,
+      "suggested_resolution": "Request account, device, or customer identifiers from the requesting agency.",
+      "evidence_id": "DEF-MISSING-IDENTIFIER"
+    },
+    {
+      "code": "overbroad_scope",
+      "severity": "warning",
+      "message": "Request spans an overbroad set of product/data domains.",
+      "requires_human_review": true,
+      "suggested_resolution": "Route to SME review for scope assessment and possible narrowing request.",
+      "evidence_id": "DEF-OVERBROAD-SCOPE"
+    },
+    {
+      "code": "ambiguous_request_type",
+      "severity": "warning",
+      "message": "Legal process type is ambiguous or could not be determined.",
+      "requires_human_review": true,
+      "suggested_resolution": "Route to SME review to confirm the legal process type.",
+      "evidence_id": "DEF-AMBIGUOUS-REQUEST-TYPE"
+    }
+  ]
+}
