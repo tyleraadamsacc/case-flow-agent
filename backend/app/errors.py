@@ -23,6 +23,19 @@ class InvalidStateTransitionError(CaseFlowError):
         )
 
 
+class AgentExecutionStateError(CaseFlowError):
+    """Raised when agent execution is requested in a workflow state where
+    the rail may not run (e.g., un-extracted intake or after approval)."""
+
+    def __init__(self, legal_request_id: str, state: WorkflowState):
+        self.legal_request_id = legal_request_id
+        self.state = state
+        super().__init__(
+            f"Agent execution is not allowed for {legal_request_id} in state "
+            f"'{state.value}'. Run extraction first; agents never run after approval."
+        )
+
+
 class AuditWriteError(CaseFlowError):
     """Raised when an audit event cannot be persisted. Any state change in
     flight must be abandoned: no audit, no transition."""

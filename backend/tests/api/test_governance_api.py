@@ -14,10 +14,10 @@ def test_summary_returns_labeled_synthetic_metrics(client):
     assert response.status_code == 200
     metrics = {m["metric_id"]: m for m in response.json()["metrics"]}
     assert set(metrics) == EXPECTED_METRIC_IDS
-    assert metrics["total_requests"]["value"] == 6
+    assert metrics["total_requests"]["value"] == 8
     assert metrics["total_requests"]["data_confidence"] == "synthetic_mock"
     assert metrics["audit_events"]["data_confidence"] == "fully_tracked"
-    assert metrics["audit_events"]["value"] == 6  # one request_ingested per seeded scenario
+    assert metrics["audit_events"]["value"] == 8  # one request_ingested per seeded scenario
 
 
 def test_summary_reflects_workflow_activity(client, advance_to_review):
@@ -30,4 +30,4 @@ def test_summary_reflects_workflow_activity(client, advance_to_review):
     assert metrics["requests_with_deficiencies"]["value"] >= 1
     assert metrics["escalated_requests"]["value"] == 1
     assert metrics["requests_requiring_human_review"]["value"] >= 1
-    assert metrics["open_requests"]["value"] == 6
+    assert metrics["open_requests"]["value"] == 8

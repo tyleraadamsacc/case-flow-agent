@@ -13,6 +13,14 @@ from app.models.enums import ActorType, AuditAction
 from app.models.workflow_state import WorkflowState
 from app.repositories.audit_repository import AuditRepository
 
+# Audit events that must exist before a request may reach audit_complete.
+REQUIRED_EVENTS_FOR_FINALIZATION: set[AuditAction] = {
+    AuditAction.REQUEST_INGESTED,
+    AuditAction.REQUEST_EXTRACTED,
+    AuditAction.SPECIAL_HANDLING_CHECKED,
+    AuditAction.ROUTE_APPROVED,
+}
+
 
 class AuditService:
     def __init__(self, repository: AuditRepository) -> None:

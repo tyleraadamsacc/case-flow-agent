@@ -22,3 +22,7 @@ class LocalResponseRecordRepository(ResponseRecordRepository):
             return []
         payload = json.loads((self._records_dir / filename).read_text())
         return [ResponsiveRecord.model_validate(item) for item in payload]
+
+    def source_for_request(self, legal_request_id: str) -> str | None:
+        filename = self._index.get(legal_request_id)
+        return f"local://response_records/{filename}" if filename else None

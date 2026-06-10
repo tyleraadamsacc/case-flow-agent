@@ -1,0 +1,68 @@
+{
+  "rules": [
+    {
+      "rule_id": "ROUTE-SENSITIVE-PARTY",
+      "priority": 1,
+      "when": {"sensitive_party": true},
+      "queue": "SME Review",
+      "escalation": true,
+      "description": "Requests from sensitive-party registry entries always route to SME review."
+    },
+    {
+      "rule_id": "ROUTE-PEN-TT-SME",
+      "priority": 2,
+      "when": {
+        "any_flag": [
+          "pen_register_requested",
+          "trap_and_trace_requested",
+          "non_disclosure_to_subscriber",
+          "sealed",
+          "no_adverse_action"
+        ]
+      },
+      "queue": "SME Review",
+      "escalation": true,
+      "description": "Pen register, trap and trace, non-disclosure, sealed, and no-adverse-action matters route to SME review."
+    },
+    {
+      "rule_id": "ROUTE-OVERBROAD-SME",
+      "priority": 3,
+      "when": {"overbroad": true},
+      "queue": "SME Review",
+      "escalation": true,
+      "description": "Overbroad multi-domain requests route to SME review for scope assessment."
+    },
+    {
+      "rule_id": "ROUTE-LOCATION-P1",
+      "priority": 4,
+      "when": {"product_domain": "Maps / Location"},
+      "queue": "Location Response Review",
+      "escalation": false,
+      "description": "Location data requests route to the location response review queue."
+    },
+    {
+      "rule_id": "ROUTE-CONTENT",
+      "priority": 5,
+      "when": {"any_flag": ["content_requested", "tombstone_requested"]},
+      "queue": "Content Response Review",
+      "escalation": false,
+      "description": "Content and tombstone-archive requests route to content response review."
+    },
+    {
+      "rule_id": "ROUTE-SUBSCRIBER",
+      "priority": 6,
+      "when": {"product_domain": "Account / Subscriber"},
+      "queue": "Subscriber Records Review",
+      "escalation": false,
+      "description": "Subscriber information requests route to subscriber records review."
+    },
+    {
+      "rule_id": "ROUTE-DEFAULT",
+      "priority": 99,
+      "when": {"always": true},
+      "queue": "General Intake Review",
+      "escalation": false,
+      "description": "Fallback queue when no specific routing rule matches."
+    }
+  ]
+}

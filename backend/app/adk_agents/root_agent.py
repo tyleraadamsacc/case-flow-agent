@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from google.adk.agents import BaseAgent
 from google.adk.workflow import START, Edge, Workflow
 
@@ -9,6 +11,7 @@ from app.adk_agents.note_taking_and_data_entry_agent import (
 )
 from app.adk_agents.text_content_agent import create_text_content_agent
 from app.adk_agents.triaging_agent import create_triaging_agent
+from app.mock_data.seed import MOCK_DATA_DIR
 
 
 class CaseFlowRootAgent(Workflow):
@@ -39,13 +42,13 @@ class CaseFlowRootAgent(Workflow):
         return agents
 
 
-def create_caseflow_root_agent() -> CaseFlowRootAgent:
+def create_caseflow_root_agent(mock_data_dir: Path = MOCK_DATA_DIR) -> CaseFlowRootAgent:
     rail = [
-        create_indexing_agent(),
-        create_triaging_agent(),
+        create_indexing_agent(mock_data_dir),
+        create_triaging_agent(mock_data_dir),
         create_etl_agent(),
         create_note_taking_and_data_entry_agent(),
-        create_text_content_agent(),
+        create_text_content_agent(mock_data_dir),
         create_automation_agent(),
     ]
     edges = [Edge(from_node=START, to_node=rail[0])]

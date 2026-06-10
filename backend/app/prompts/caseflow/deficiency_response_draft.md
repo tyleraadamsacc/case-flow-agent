@@ -1,0 +1,14 @@
+---
+version: 0.1.0
+task: deficiency_response_draft
+output_schema: TextDraft
+status: placeholder — no live model integration exists in this codebase
+---
+
+# deficiency_response_draft (placeholder)
+
+Prompt content arrives with the Gemini-backed implementation (plan §15,
+PR 8). Deterministic behavior remains the default and the fallback; model
+output must validate against the schema above (one repair attempt, then
+block for human review). Synthetic data only. The model never finalizes,
+approves, sends, or releases anything.
