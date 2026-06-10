@@ -1581,3 +1581,9 @@ select.cf-input {
   font-size: var(--font-small);
   color: var(--text-secondary);
 }
+
+.cf-review__hint {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-small);
+  color: var(--text-muted);
+}

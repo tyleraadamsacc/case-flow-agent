@@ -127,19 +127,16 @@ export default function ReviewPanel({
             variant="filled"
             disabled={busy !== null}
             onClick={() =>
-              act("Review approval", async () => {
+              act("Route approval", async () => {
                 const reviewed = await api.review(request.legal_request_id, {
                   action: "approve",
                   comments: trimmed || undefined,
                 });
-                const approved = await api.approve(request.legal_request_id, {
-                  comments: trimmed || undefined,
-                });
-                return approved.legal_request ?? reviewed.legal_request;
+                return reviewed.legal_request;
               })
             }
           >
-            {busy === "Review approval" ? "Approving…" : "Approve route"}
+            {busy === "Route approval" ? "Approving…" : "Approve route"}
           </Button>
           <Button
             disabled={busy !== null}
@@ -182,7 +179,25 @@ export default function ReviewPanel({
           >
             Send to QA
           </Button>
+          <Button
+            disabled={busy !== null}
+            onClick={() =>
+              act("Finalization", async () => {
+                const response = await api.approve(request.legal_request_id, {
+                  comments: trimmed || undefined,
+                });
+                return response.legal_request;
+              })
+            }
+          >
+            {busy === "Finalization" ? "Finalizing…" : "Finalize request"}
+          </Button>
         </div>
+        <p className="cf-review__hint">
+          Approving the route records your decision and clears agent holds —
+          re-run the six-agent workflow afterwards if any run was blocked.
+          Finalize completes the audit once nothing is blocked.
+        </p>
 
         {error ? <p className="cf-review__error">{error}</p> : null}
         {notice ? <p className="cf-review__notice">{notice}</p> : null}

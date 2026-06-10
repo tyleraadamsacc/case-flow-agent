@@ -15,10 +15,17 @@ make dev-frontend    # terminal 2 — SPA on :5173
 ```
 
 Open `http://localhost:5173`. **Reset between runs:** state is
-in-process — restart `make dev-backend` and the eight synthetic
-scenarios reseed automatically (`make demo-reset` prints this).
+in-process — restart `make dev-backend` and the demo dataset reseeds
+automatically (`make demo-reset` prints this).
 
-A backend-only rehearsal exists too: `make demo-scenario-a`.
+**The demo dataset is the two source documents** under
+`backend/app/mock_data/source_documents/`: the *LERS Request Template*
+(the Larimer County search warrant + ex parte order, placeholders filled
+with the values from the response document) and the *Template LERS
+Response* (the 8-record GPS production). `make dev-backend` seeds only
+this pair (`CASEFLOW_SEED_DATASET=demo`); the eight test scenarios
+remain available with `CASEFLOW_SEED_DATASET=full`. A backend-only
+rehearsal of the full dataset exists too: `make demo-scenario-a`.
 
 ## Act 1 — the landing answer (Governance & Insights, ~1 min)
 
@@ -35,50 +42,57 @@ The app opens on Governance & Insights.
 (Counts are zero on a fresh start — that's honest; they fill in live
 during the demo. Re-visit this screen in Act 5.)
 
-## Act 2 — Scenario A end to end (Request Detail, ~4 min)
+## Act 2 — the warrant, end to end (Request Detail, ~5 min)
 
-Request Queue → open **LER-2026-004812** (GPS search warrant).
+Request Queue → open **LER-2026-004812** — the LERS Request Template as
+a filled search warrant (pen register/trap-and-trace + location +
+subscriber information).
 
-1. **Extract request** — the source warrant highlights what extraction
-   grounded each field on; the Extracted Fields panel fills: process,
-   agency, identifiers, GPS categories, valid date range, 35-day
-   deadline, authorities.
-2. **Validate request** — special handling and policy reasons appear in
-   the Human review panel (search warrant + location tracking force
-   review by code, not by prompt).
-3. **Run six-agent workflow** — the Six-Agent Workflow Rail fills in
-   order. Per card: official name, status, output summary, confidence,
-   **Evidence** (click one — the drawer resolves the stable evidence id
-   to the SOP/routing rule/template that grounded it), and **Audit**
-   (one audit event per run, always).
+1. **Extract request** — the full warrant text is the source document;
+   extraction highlights its grounding spans and *ignores the template's
+   instruction block* ("PLEASE DELETE…"). The Extracted Fields panel
+   fills: search warrant + ex parte order, the agency block, the three
+   identifiers from the response document, May 10–15 2026, fourteen
+   product domains, and the warrant's full special-handling set (sealed,
+   non-disclosure for one year, no adverse action, pen register, trap
+   and trace, ongoing access, content, Tombstone, location).
+2. **Validate request** — the policy reasons appear in the Human review
+   panel. This warrant forces review by code many times over.
+3. **Run six-agent workflow** — the rail fills, and the story is the
+   hold: **the ETL Agent is blocked — SME escalation pending.** Text
+   Content drafted the SME notification, Automation *prepared* the
+   escalation. Click **Finalize request** to show it refused: blocked
+   agent runs block finalization, audited as such.
 
-   > "Indexing labeled it and matched intake SOPs. Triaging classified
-   > it and *recommended* a route — pending human approval. ETL simulated
-   > a read-only pull: 8 synthetic GPS records. Note Taking drafted the
-   > intake note. Text Content drafted the response package. Automation
-   > *prepared* the approval task — prepared, never executed."
+   > "The warrant asks for everything and carries every special-handling
+   > flag — so the system refuses to simulate the pull until a person
+   > decides."
 
-4. **Drafted artifacts** — the Template LERS Response draft: watermark
-   "Draft — pending analyst review · synthetic / mock data", per-section
-   agent provenance chips, the record index copied verbatim from the ETL
-   output, chain of custody and certification both pending statuses.
-5. **Approve route** (add a comment) — state moves to **Audit complete**;
-   the audit summary shows 12 events: system, each agent by name, and
-   the human decisions.
+4. **Approve route** (add a comment) — the human decision is recorded.
+   **Run six-agent workflow again**: the ETL Agent now completes with
+   the 8 synthetic GPS records, the Note Taking and Data Entry Agent
+   drafts the response-prep note, and the Text Content Agent drafts the
+   production package.
+5. **Drafted artifacts** — the package *is* the Template LERS Response:
+   PROD-2026-004812-01, the eight records verbatim (timestamps,
+   coordinates, accuracies), the document's field definitions, chain of
+   custody ("Internal Location Data Repository Query" by the Legal
+   Response Operations Team), and the Jane Doe certification — every
+   status still pending until a person approves.
+6. **Finalize request** — now it succeeds: **Audit complete**. The audit
+   summary shows every agent run (including the blocked one — it stays
+   in the trail), the route approval, and the finalization.
 
-   > "The agent did the work; the person made the decision; the audit
-   > trail proves both."
+   > "The agents did the work twice; the person made the decision in the
+   > middle; the audit trail proves all of it."
 
-## Act 3 — the exception paths (~2 min)
+## Act 3 — the exception paths (optional, ~2 min)
 
-- **LER-2026-004821** (Scenario B): extract → validate → run agents. The
-  **ETL Agent card is blocked — missing date range** and stays visible;
-  Text Content drafted a deficiency clarification instead; package
-  drafting is disabled with the reason. Blocked is a feature, not a
-  failure to hide.
-- **LER-2026-004835** (Scenario C): pen register + non-disclosure. The
-  rail shows SME routing, a drafted SME notification, and Automation's
-  *prepared* escalation — all pending a person.
+Restart the backend with `CASEFLOW_SEED_DATASET=full` to show the eight
+test scenarios: Scenario B's missing-date-range block (deficiency
+clarification draft, package drafting disabled) and Scenario C's pen
+register path. The demo dataset itself already demonstrates the blocked
+path in Act 2.
 
 ## Act 4 — attention and audit (~2 min)
 
@@ -106,8 +120,9 @@ screen in under ten seconds.
   In model-assisted modes, output is schema-validated, repaired once,
   then falls back to the deterministic draft with mandatory human review
   — recorded in the run's audit event.
-- **"Is this real data?"** No — synthetic only, labeled on every screen,
-  record, and metric.
+- **"Is this real data?"** No — the dataset is two mock template
+  documents (the request and response templates), synthetic only,
+  labeled on every screen, record, and metric.
 - **"What about production GCP?"** Local-first; adapters are config-only
   skeletons (see docs/DEPLOYMENT.md). Nothing in the codebase can write
   to LERS, Cases, or email.
