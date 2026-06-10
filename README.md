@@ -40,15 +40,16 @@ Requires Python 3.11+ and Node 18+.
 ```bash
 cp .env.local.example .env.local   # no credentials needed; defaults are fine
 make install                       # backend venv + frontend node_modules
-make test                          # backend test suite (unit + api)
+make test                          # backend test suite
+make test-frontend                 # frontend test suite (Vitest)
 make dev-backend                   # FastAPI on http://localhost:8000 (GET /healthz)
 make dev-frontend                  # Vite dev server (proxies /healthz and /api to :8000)
 ```
 
-Mock data: the six synthetic scenario fixtures under
-`backend/app/mock_data/legal_requests/` are seeded automatically at startup
-(idempotent; set `CASEFLOW_SEED_ON_STARTUP=false` to disable). Interactive API
-docs are at `http://localhost:8000/docs`.
+Frontend design system: visual direction and component rules live in
+[frontend/UI_THEME_AND_GEMINI_UX_GUIDE.md](frontend/UI_THEME_AND_GEMINI_UX_GUIDE.md);
+a living component reference (including the Six-Agent Workflow Rail) renders at
+`http://localhost:5173/design-system` under `make dev-frontend`.
 
 ## Repository layout
 

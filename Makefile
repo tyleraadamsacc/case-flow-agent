@@ -6,7 +6,7 @@ PYTHON ?= $(shell command -v python3.13 || command -v python3.12 || command -v p
 VENV := backend/.venv
 
 .PHONY: install install-backend install-frontend dev-backend dev-frontend \
-        test test-unit test-api lint build-frontend
+        test test-unit test-api test-frontend lint build-frontend
 
 install: install-backend install-frontend
 
@@ -32,6 +32,9 @@ test-unit:
 
 test-api:
 	cd backend && .venv/bin/pytest tests/api
+
+test-frontend:
+	cd frontend && npm test
 
 lint:
 	cd backend && .venv/bin/ruff check app tests

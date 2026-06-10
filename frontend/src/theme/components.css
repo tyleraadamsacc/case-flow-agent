@@ -1,0 +1,825 @@
+/* CaseFlow component styles. Class prefix: cf-.
+   Tokens come from tokens.css; components never hardcode palette values. */
+
+/* ---------- Button ---------- */
+
+.cf-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  font-family: inherit;
+  font-size: var(--font-body);
+  font-weight: 500;
+  line-height: 1;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: background var(--motion-fast), box-shadow var(--motion-fast);
+}
+
+.cf-button--sm {
+  padding: 6px 14px;
+  font-size: var(--font-small);
+}
+
+.cf-button--filled {
+  background: var(--blue);
+  color: var(--text-on-color);
+}
+
+.cf-button--filled:hover:not(:disabled) {
+  background: #1765cc;
+  box-shadow: 0 1px 3px rgba(26, 115, 232, 0.4);
+}
+
+/* Primary-action glow: the one place a button touches the gradient. */
+.cf-button--filled.cf-button--glow {
+  position: relative;
+}
+
+.cf-button--filled.cf-button--glow::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  background: var(--gemini-soft-gradient);
+  z-index: -1;
+  filter: blur(4px);
+}
+
+.cf-button--tonal {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.cf-button--tonal:hover:not(:disabled) {
+  background: #dce8fd;
+}
+
+.cf-button--text {
+  background: transparent;
+  color: var(--blue);
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.cf-button--text:hover:not(:disabled) {
+  background: var(--blue-soft);
+}
+
+.cf-button--outlined {
+  background: var(--surface-card);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+.cf-button--outlined:hover:not(:disabled) {
+  background: var(--surface-soft);
+}
+
+.cf-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- Card ---------- */
+
+.cf-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-5);
+}
+
+.cf-card--soft {
+  background: var(--surface-soft);
+  box-shadow: none;
+}
+
+.cf-card--tint {
+  background: var(--surface-tint-blue);
+  box-shadow: none;
+}
+
+/* Insight cards: the gradient appears as a thin top accent, nothing more. */
+.cf-card--insight {
+  position: relative;
+  overflow: hidden;
+}
+
+.cf-card--insight::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gemini-gradient);
+}
+
+.cf-card--interactive {
+  transition: box-shadow var(--motion-standard), transform var(--motion-standard);
+}
+
+.cf-card--interactive:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.cf-card__title {
+  font-size: var(--font-section);
+  font-weight: 500;
+  margin-bottom: var(--space-1);
+}
+
+.cf-card__subtitle {
+  font-size: var(--font-small);
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-3);
+}
+
+/* ---------- Chip ---------- */
+
+.cf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  font-family: inherit;
+  font-size: var(--font-small);
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+button.cf-chip {
+  cursor: pointer;
+}
+
+.cf-chip__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.cf-chip--neutral {
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  border-color: var(--border-subtle);
+}
+
+.cf-chip--blue {
+  background: var(--blue-soft);
+  color: #185abc;
+}
+
+.cf-chip--green {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.cf-chip--amber {
+  background: var(--yellow-soft);
+  color: #a05a00;
+}
+
+.cf-chip--red {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.cf-chip--violet {
+  background: var(--violet-soft);
+  color: #5b2bd9;
+}
+
+.cf-chip--cyan {
+  background: var(--cyan-soft);
+  color: #00808f;
+}
+
+/* ---------- StatusBadge ---------- */
+
+.cf-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  font-size: var(--font-small);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cf-status__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+.cf-status--neutral {
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  border-color: var(--border-subtle);
+}
+
+.cf-status--green {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.cf-status--amber {
+  background: var(--yellow-soft);
+  color: #a05a00;
+}
+
+.cf-status--red {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.cf-status--blue {
+  background: var(--blue-soft);
+  color: #185abc;
+}
+
+.cf-status--violet {
+  background: var(--violet-soft);
+  color: #5b2bd9;
+}
+
+/* Running: the gradient signals live agent activity — gradient border,
+   calm tinted fill, dark readable text. */
+.cf-status--gradient {
+  color: var(--text-primary);
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--surface-card), var(--surface-card)) padding-box,
+    var(--gemini-gradient) border-box;
+}
+
+.cf-status--gradient .cf-status__dot {
+  background: var(--gemini-gradient);
+  animation: cf-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes cf-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- ConfidenceBar ---------- */
+
+.cf-confidence {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.cf-confidence__track {
+  display: block;
+  flex: 1;
+  min-width: 60px;
+  max-width: 160px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-track);
+  overflow: hidden;
+}
+
+.cf-confidence__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width var(--motion-slow);
+}
+
+.cf-confidence__fill--green {
+  background: var(--green);
+}
+
+.cf-confidence__fill--amber {
+  background: var(--yellow);
+}
+
+.cf-confidence__fill--red {
+  background: var(--red);
+}
+
+.cf-confidence__label {
+  font-size: var(--font-small);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.cf-confidence__none {
+  font-size: var(--font-small);
+  color: var(--text-muted);
+}
+
+/* ---------- Evidence / Audit links ---------- */
+
+.cf-meta-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--font-small);
+  color: var(--blue);
+  cursor: pointer;
+}
+
+.cf-meta-link:hover {
+  background: var(--blue-soft);
+}
+
+.cf-meta-link__icon {
+  flex: none;
+}
+
+/* ---------- App shell ---------- */
+
+.cf-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--background-app);
+}
+
+.cf-shell__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cf-shell__body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.cf-shell__content {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-6) var(--space-8);
+  max-width: 1400px;
+}
+
+.cf-shell__context {
+  width: 320px;
+  flex: none;
+  padding: var(--space-6) var(--space-6) var(--space-6) 0;
+}
+
+@media (max-width: 1100px) {
+  .cf-shell__body {
+    flex-direction: column;
+  }
+
+  .cf-shell__content {
+    padding: var(--space-4);
+  }
+
+  .cf-shell__context {
+    width: auto;
+    padding: 0 var(--space-4) var(--space-4);
+  }
+}
+
+/* ---------- Top bar ---------- */
+
+.cf-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-6);
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-bar);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.cf-topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-section);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cf-topbar__brand-mark {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--gemini-gradient);
+  flex: none;
+}
+
+.cf-topbar__divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border-subtle);
+  flex: none;
+}
+
+.cf-topbar__title {
+  font-size: var(--font-body);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cf-topbar__spacer {
+  flex: 1;
+}
+
+.cf-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ---------- Side nav ---------- */
+
+.cf-sidenav {
+  width: 232px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4) var(--space-3);
+  background: var(--surface-card);
+  border-right: 1px solid var(--border-subtle);
+  transition: width var(--motion-standard);
+}
+
+.cf-sidenav--collapsed {
+  width: 68px;
+}
+
+.cf-sidenav__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.cf-sidenav__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-body);
+  color: var(--text-secondary);
+  padding: 10px 14px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition: background var(--motion-fast);
+}
+
+.cf-sidenav__item:hover {
+  background: var(--surface-soft);
+}
+
+.cf-sidenav__item[aria-current="page"] {
+  background: var(--blue-soft);
+  color: #185abc;
+  font-weight: 500;
+}
+
+.cf-sidenav__icon {
+  flex: none;
+  display: inline-flex;
+}
+
+.cf-sidenav--collapsed .cf-sidenav__label {
+  display: none;
+}
+
+/* Auto-collapse to icon rail on narrow screens. */
+@media (max-width: 900px) {
+  .cf-sidenav {
+    width: 68px;
+  }
+
+  .cf-sidenav__label {
+    display: none;
+  }
+}
+
+.cf-sidenav__footer {
+  margin-top: auto;
+  padding-top: var(--space-3);
+}
+
+/* ---------- Synthetic data banner ---------- */
+
+.cf-synthetic-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-6);
+  background: var(--violet-soft);
+  color: #5b2bd9;
+  font-size: var(--font-small);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* ---------- Agent run card ---------- */
+
+.cf-agent-card {
+  position: relative;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-left: 4px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.cf-agent-card--complete {
+  border-left-color: var(--green);
+}
+
+.cf-agent-card--waiting {
+  border-left-color: var(--border-subtle);
+  box-shadow: none;
+  background: var(--surface-soft);
+}
+
+/* Running: gradient border carries the "agent is thinking" signal. */
+.cf-agent-card--running {
+  border: 1px solid transparent;
+  border-left-width: 4px;
+  background:
+    linear-gradient(var(--surface-card), var(--surface-card)) padding-box,
+    var(--gemini-gradient) border-box;
+}
+
+.cf-agent-card--running::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--gemini-soft-gradient);
+  background-size: 200% 200%;
+  opacity: 0.4;
+  pointer-events: none;
+  animation: cf-shimmer 2.6s ease-in-out infinite;
+}
+
+@keyframes cf-shimmer {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.cf-agent-card--blocked {
+  border-left-color: var(--red);
+  background: var(--red-soft);
+}
+
+.cf-agent-card--failed {
+  border-left-color: var(--red);
+  background: var(--red-soft);
+}
+
+.cf-agent-card--needs_review {
+  border-left-color: var(--yellow);
+  background: var(--yellow-soft);
+}
+
+.cf-agent-card__header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.cf-agent-card__ordinal {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-small);
+  font-weight: 700;
+}
+
+.cf-agent-card__name {
+  font-size: var(--font-body);
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+}
+
+.cf-agent-card__role {
+  font-size: var(--font-small);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.cf-agent-card__summary {
+  font-size: var(--font-body);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.cf-agent-card__blocked-reason {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  font-size: var(--font-small);
+  color: var(--red);
+  background: var(--surface-card);
+  border: 1px solid var(--red-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+}
+
+.cf-agent-card__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cf-agent-card__details {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--font-small);
+  color: var(--text-secondary);
+}
+
+.cf-agent-card__details dt {
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: var(--font-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.cf-agent-card__details dd {
+  margin: 2px 0 0;
+}
+
+.cf-agent-card__details-toggle {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--font-small);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.cf-agent-card__details-toggle:hover {
+  background: var(--surface-soft);
+}
+
+.cf-agent-card__timestamp {
+  font-size: var(--font-micro);
+  color: var(--text-muted);
+}
+
+/* ---------- Six-Agent Workflow Rail ---------- */
+
+/* 3×2 grid by default — cards need width to keep the official names and
+   summaries readable. Six-across only on very wide screens. */
+.cf-rail {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.cf-rail__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cf-rail__item > .cf-agent-card {
+  flex: 1;
+}
+
+/* Connector between cards (horizontal), suppressed at row ends. */
+.cf-rail__item:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  top: 28px;
+  right: calc(-1 * var(--space-3) + 1px);
+  width: var(--space-3);
+  height: 2px;
+  background: var(--border-subtle);
+}
+
+.cf-rail__item:nth-child(3n)::after {
+  display: none;
+}
+
+@media (min-width: 1760px) {
+  .cf-rail {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .cf-rail__item:nth-child(3n)::after {
+    display: block;
+  }
+}
+
+@media (max-width: 760px) {
+  .cf-rail {
+    grid-template-columns: 1fr;
+  }
+
+  .cf-rail__item:not(:last-child)::after,
+  .cf-rail__item:nth-child(3n):not(:last-child)::after {
+    top: auto;
+    right: auto;
+    bottom: calc(-1 * var(--space-3) + 1px);
+    left: 28px;
+    width: 2px;
+    height: var(--space-3);
+    display: block;
+  }
+}
+
+/* ---------- Design-system preview page ---------- */
+
+.cf-preview__section {
+  margin-bottom: var(--space-8);
+}
+
+.cf-preview__section > h2 {
+  font-size: var(--font-title);
+  margin-bottom: var(--space-2);
+}
+
+.cf-preview__section > p {
+  color: var(--text-secondary);
+  margin: 0 0 var(--space-4);
+  max-width: 640px;
+}
+
+.cf-preview__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cf-preview__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
