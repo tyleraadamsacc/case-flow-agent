@@ -46,10 +46,12 @@ make dev-backend                   # FastAPI on http://localhost:8000 (GET /heal
 make dev-frontend                  # Vite dev server (proxies /healthz and /api to :8000)
 ```
 
-Frontend design system: visual direction and component rules live in
+With both servers running, `http://localhost:5173` opens the Request Queue.
+Open a request to walk the full workflow in the browser: extract → validate →
+run the six-agent workflow → review the drafts → approve/escalate/send to QA —
+every step human-decided and audited. The frontend design system lives in
 [frontend/UI_THEME_AND_GEMINI_UX_GUIDE.md](frontend/UI_THEME_AND_GEMINI_UX_GUIDE.md);
-a living component reference (including the Six-Agent Workflow Rail) renders at
-`http://localhost:5173/design-system` under `make dev-frontend`.
+a living component reference renders at `http://localhost:5173/design-system`.
 
 ## Repository layout
 
