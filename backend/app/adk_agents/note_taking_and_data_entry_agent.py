@@ -10,6 +10,7 @@ from typing import Any
 
 from app.adk_agents import session_state
 from app.adk_agents.base import CaseFlowAgent
+from app.llm.model_assist import ModelAssist
 from app.adk_agents.registry import NOTE_TAKING_AND_DATA_ENTRY_AGENT, OFFICIAL_AGENT_NAMES
 from app.adk_agents.shared import (
     blocking_deficiencies,
@@ -174,9 +175,13 @@ class NoteTakingAndDataEntryAgent(CaseFlowAgent):
         return fields
 
 
-def create_note_taking_and_data_entry_agent() -> NoteTakingAndDataEntryAgent:
+def create_note_taking_and_data_entry_agent(
+    llm_assist: ModelAssist | None = None,
+) -> NoteTakingAndDataEntryAgent:
     return NoteTakingAndDataEntryAgent(
         name=NOTE_TAKING_AND_DATA_ENTRY_AGENT,
+        llm_task="note_drafting",
+        llm_assist=llm_assist,
         display_name=OFFICIAL_AGENT_NAMES[NOTE_TAKING_AND_DATA_ENTRY_AGENT],
         description=(
             "Drafts structured internal notes and the fields to update on "

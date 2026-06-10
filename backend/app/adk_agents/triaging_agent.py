@@ -13,6 +13,7 @@ from typing import Any
 
 from app.adk_agents import session_state
 from app.adk_agents.base import CaseFlowAgent
+from app.llm.model_assist import ModelAssist
 from app.adk_agents.registry import INDEXING_AGENT, OFFICIAL_AGENT_NAMES, TRIAGING_AGENT
 from app.adk_agents.shared import (
     active_flags,
@@ -228,7 +229,9 @@ class TriagingAgent(CaseFlowAgent):
         return 0.85
 
 
-def create_triaging_agent(mock_data_dir: Path = MOCK_DATA_DIR) -> TriagingAgent:
+def create_triaging_agent(
+    mock_data_dir: Path = MOCK_DATA_DIR, llm_assist: ModelAssist | None = None
+) -> TriagingAgent:
     routing_rules = json.loads(
         (mock_data_dir / "sop" / "routing_rules.json").read_text()
     )["rules"]
@@ -237,6 +240,8 @@ def create_triaging_agent(mock_data_dir: Path = MOCK_DATA_DIR) -> TriagingAgent:
     )
     return TriagingAgent(
         name=TRIAGING_AGENT,
+        llm_task="triage_classification",
+        llm_assist=llm_assist,
         display_name=OFFICIAL_AGENT_NAMES[TRIAGING_AGENT],
         description=(
             "Classifies the legal request (type, category, urgency, "

@@ -1,6 +1,6 @@
 ---
 version: 0.1.0
-task: qa_guardrail
+task: qa_validation
 output_schema: QaValidationResult (PR 8)
 status: placeholder — no live model integration exists in this codebase
 ---

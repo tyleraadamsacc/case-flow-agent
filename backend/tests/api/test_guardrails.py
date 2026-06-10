@@ -38,16 +38,17 @@ def test_no_production_write_back_adapters_exist():
         assert not any(forbidden in name for name in repository_modules), repository_modules
 
 
-def test_no_gemini_integration_in_pr1():
-    # ADK's event plumbing legitimately uses google.genai content types in
-    # the placeholder agents; what must not exist yet is model invocation.
-    forbidden_call_markers = ("generate_content", "GenerativeModel", "gemini-")
+def test_model_invocation_only_inside_the_single_wrapper():
+    # Plan §15 / GCP DoD: Gemini is reachable only through the one
+    # google-genai wrapper. No other module may invoke a model, and no
+    # model id may be hardcoded anywhere — ids come from configuration.
+    wrapper = APP_DIR / "llm" / "gemini_client.py"
     for path in APP_DIR.rglob("*.py"):
         source = path.read_text()
-        for marker in forbidden_call_markers:
-            assert marker not in source, f"{marker} found in {path}"
-    pyproject = (APP_DIR.parent / "pyproject.toml").read_text()
-    assert "google-genai" not in pyproject
+        assert "gemini-" not in source, f"hardcoded model id in {path}"
+        if path != wrapper:
+            for marker in ("generate_content", "GenerativeModel"):
+                assert marker not in source, f"{marker} found outside wrapper: {path}"
 
 
 def test_app_starts_with_no_credential_env_vars(monkeypatch, tmp_path):

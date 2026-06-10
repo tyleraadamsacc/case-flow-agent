@@ -38,6 +38,12 @@ class AgentRunDraft(CaseFlowModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     latency_ms: float | None = None
+    # Model metadata (plan §15): stamped by ModelAssist when a
+    # model-assisted mode re-drafts the payload; None in deterministic
+    # mode. The model never owns the run — it only re-drafts content.
+    model_id: str | None = None
+    prompt_version: str | None = None
+    retry_count: int = 0
 
 
 class AgentRun(AgentRunDraft):
@@ -52,7 +58,4 @@ class AgentRun(AgentRunDraft):
     agent_run_id: str = Field(default_factory=_agent_run_id)
     legal_request_id: str
     audit_event_id: str | None = None
-    model_id: str | None = None
-    prompt_version: str | None = None
     input_hash: str | None = None
-    retry_count: int = 0

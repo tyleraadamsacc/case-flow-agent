@@ -8,6 +8,9 @@ from fastapi import Request
 from app.config import Settings
 from app.mock_data.seed import seed_legal_requests
 from app.models.enums import ActorType
+from app.llm.model_assist import ModelAssist
+from app.llm.model_router import ModelRouter
+from app.llm.prompt_loader import PromptLoader
 from app.orchestration.agent_execution_service import AgentExecutionService
 from app.orchestration.approval_policy import ApprovalPolicy
 from app.orchestration.workflow_state_machine import WorkflowStateMachine
@@ -61,12 +64,21 @@ class Container:
             self.approval_policy,
             self.agent_run_repository,
         )
+        self.model_router = ModelRouter(settings)
+        # ModelAssist only exists in model-assisted modes; deterministic
+        # mode (the default) never constructs a model client.
+        self.model_assist = (
+            ModelAssist(self.model_router, PromptLoader())
+            if settings.model_mode in ("mock_model", "gemini")
+            else None
+        )
         self.agent_execution_service = AgentExecutionService(
             self.legal_request_repository,
             self.agent_run_repository,
             self.response_record_repository,
             self.audit_service,
             mock_data_dir=mock_dir,
+            llm_assist=self.model_assist,
         )
 
     def seed(self) -> int:

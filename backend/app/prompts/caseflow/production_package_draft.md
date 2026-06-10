@@ -1,6 +1,6 @@
 ---
 version: 0.1.0
-task: production_package_draft
+task: response_package_drafting
 output_schema: TextDraft + ProductionPackage
 status: placeholder — no live model integration exists in this codebase
 ---
