@@ -1,0 +1,79 @@
+LAW ENFORCEMENT RESPONSE PACKAGE
+Request ID: LER-2026-004812Production ID: PROD-2026-004812-01Date Produced: June 9, 2026
+REQUESTING AGENCY
+Agency: Los Angeles County Sheriff's OfficeCase Number: MC-26-11784Officer: Detective Sarah JohnsonLegal Process: Search Warrant John DoeDate Received: June 1, 2026
+SUBJECT IDENTIFIERS
+Account ID: ACC-7784512Customer Reference: CUST-992181Associated Device ID: DEV-88471
+PRODUCTION SUMMARY
+The Company has identified responsive GPS location records associated with the account listed above for the requested period:
+Start Date: May 10, 2026 00:00:00 UTCEnd Date: May 15, 2026 23:59:59 UTC
+Total Responsive Records: 8
+The enclosed records are produced pursuant to the legal process identified above and reflect information maintained in the ordinary course of business.
+INDEX OF PRODUCED RECORDS
+Record Count: 8
+Record ID
+Timestamp (UTC)
+Latitude
+Longitude
+Accuracy (Meters)
+Source
+GPS-0001
+2026-05-10 08:14:22
+39.7421
+-104.9915
+12
+Mobile Device
+GPS-0002
+2026-05-10 09:47:03
+39.7395
+-104.9848
+15
+Mobile Device
+GPS-0003
+2026-05-11 12:11:18
+39.7289
+-104.9734
+10
+Mobile Device
+GPS-0004
+2026-05-11 14:53:42
+39.7212
+-104.9659
+8
+Mobile Device
+GPS-0005
+2026-05-12 18:02:57
+39.7155
+-104.9507
+14
+Mobile Device
+GPS-0006
+2026-05-13 07:41:16
+39.7041
+-104.9431
+11
+Mobile Device
+GPS-0007
+2026-05-14 16:18:34
+39.6972
+-104.9375
+13
+Mobile Device
+GPS-0008
+2026-05-15 21:55:08
+39.6888
+-104.9292
+9
+Mobile Device
+DATA FIELD DEFINITIONS
+Timestamp (UTC)Date and time when the location record was generated.
+LatitudeNorth/South geographic coordinate in decimal degrees.
+LongitudeEast/West geographic coordinate in decimal degrees.
+Accuracy (Meters)Estimated radius of accuracy associated with the recorded coordinate.
+SourceSystem that generated the location event.
+CHAIN OF CUSTODY
+Collection Date: June 8, 2026Collection Method: Internal Location Data Repository QueryCollected By: Legal Response Operations TeamReview Status: Reviewed and Approved
+PRODUCTION CERTIFICATION
+I certify that the attached records were retrieved from systems maintained in the ordinary course of business and are true copies of records responsive to the legal process identified above.
+Authorized Representative:Jane DoeLegal Operations Analyst
+END OF PRODUCTION PACKAGE

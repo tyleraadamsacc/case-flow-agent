@@ -28,7 +28,8 @@ def test_scenario_a_drafts_full_package_with_eight_gps_records(
     body = response.json()
     assert body["requires_human_approval"] is True
     package = body["production_package"]
-    assert package["production_id"] == f"PROD-{SCENARIO_A}-01"
+    # Production ID format per Template LERS Response: PROD-2026-004812-01.
+    assert package["production_id"] == "PROD-2026-004812-01"
     assert package["status"] == "draft_pending_analyst_review"
     assert package["production_summary"]["total_responsive_records"] == 8
     assert len(package["records"]) == 8

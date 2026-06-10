@@ -73,7 +73,8 @@ class ResponsePackageService:
         field_kind = "gps" if self._is_location_request(request) else "subscriber"
         return ProductionPackage(
             request_id=request.legal_request_id,
-            production_id=f"PROD-{request.legal_request_id}-01",
+            # Format per Template LERS Response: PROD-2026-004812-01.
+            production_id=f"PROD-{request.legal_request_id.removeprefix('LER-')}-01",
             date_produced=as_of,
             requesting_agency=request.requesting_agency,
             subject_identifiers=request.subject_identifiers,
@@ -99,6 +100,9 @@ class ResponsePackageService:
                 collected_by=self._rules["chain_of_custody_template"]["collected_by"],
             ),
             certification=Certification(
+                authorized_representative=self._rules["certification_template"].get(
+                    "authorized_representative"
+                ),
                 title=self._rules["certification_template"]["title"],
                 certification_text=self._rules["certification_template"][
                     "certification_text"

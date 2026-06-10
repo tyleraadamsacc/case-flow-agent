@@ -1,10 +1,10 @@
 [
   {"record_id": "GPS-0001", "timestamp_utc": "2026-05-10T08:14:22Z", "latitude": 39.7421, "longitude": -104.9915, "accuracy_meters": 12, "source": "Mobile Device"},
   {"record_id": "GPS-0002", "timestamp_utc": "2026-05-10T09:47:03Z", "latitude": 39.7395, "longitude": -104.9848, "accuracy_meters": 15, "source": "Mobile Device"},
-  {"record_id": "GPS-0003", "timestamp_utc": "2026-05-11T07:32:51Z", "latitude": 39.7458, "longitude": -104.9990, "accuracy_meters": 9, "source": "Mobile Device"},
-  {"record_id": "GPS-0004", "timestamp_utc": "2026-05-11T18:05:17Z", "latitude": 39.7301, "longitude": -104.9712, "accuracy_meters": 21, "source": "Wi-Fi"},
-  {"record_id": "GPS-0005", "timestamp_utc": "2026-05-12T12:40:09Z", "latitude": 39.7512, "longitude": -105.0021, "accuracy_meters": 11, "source": "Mobile Device"},
-  {"record_id": "GPS-0006", "timestamp_utc": "2026-05-13T16:22:44Z", "latitude": 39.7387, "longitude": -104.9889, "accuracy_meters": 14, "source": "Mobile Device"},
-  {"record_id": "GPS-0007", "timestamp_utc": "2026-05-14T10:11:30Z", "latitude": 39.7440, "longitude": -104.9933, "accuracy_meters": 8, "source": "Cell Tower"},
-  {"record_id": "GPS-0008", "timestamp_utc": "2026-05-15T21:58:02Z", "latitude": 39.7369, "longitude": -104.9801, "accuracy_meters": 17, "source": "Mobile Device"}
+  {"record_id": "GPS-0003", "timestamp_utc": "2026-05-11T12:11:18Z", "latitude": 39.7289, "longitude": -104.9734, "accuracy_meters": 10, "source": "Mobile Device"},
+  {"record_id": "GPS-0004", "timestamp_utc": "2026-05-11T14:53:42Z", "latitude": 39.7212, "longitude": -104.9659, "accuracy_meters": 8, "source": "Mobile Device"},
+  {"record_id": "GPS-0005", "timestamp_utc": "2026-05-12T18:02:57Z", "latitude": 39.7155, "longitude": -104.9507, "accuracy_meters": 14, "source": "Mobile Device"},
+  {"record_id": "GPS-0006", "timestamp_utc": "2026-05-13T07:41:16Z", "latitude": 39.7041, "longitude": -104.9431, "accuracy_meters": 11, "source": "Mobile Device"},
+  {"record_id": "GPS-0007", "timestamp_utc": "2026-05-14T16:18:34Z", "latitude": 39.6972, "longitude": -104.9375, "accuracy_meters": 13, "source": "Mobile Device"},
+  {"record_id": "GPS-0008", "timestamp_utc": "2026-05-15T21:55:08Z", "latitude": 39.6888, "longitude": -104.9292, "accuracy_meters": 9, "source": "Mobile Device"}
 ]
