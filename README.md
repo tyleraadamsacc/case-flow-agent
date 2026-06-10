@@ -46,7 +46,11 @@ make dev-backend                   # FastAPI on http://localhost:8000 (GET /heal
 make dev-frontend                  # Vite dev server (proxies /healthz and /api to :8000)
 ```
 
-With both servers running, `http://localhost:5173` opens the Request Queue.
+With both servers running, `http://localhost:5173` opens the console.
+A scripted ~10-minute leadership demo lives in
+[docs/DEMO_WALKTHROUGH.md](docs/DEMO_WALKTHROUGH.md);
+the definition-of-done status is tracked in
+[docs/DOD_CHECKLIST.md](docs/DOD_CHECKLIST.md).
 Open a request to walk the full workflow in the browser: extract → validate →
 run the six-agent workflow → review the drafts → approve/escalate/send to QA —
 every step human-decided and audited. The frontend design system lives in

@@ -1,18 +1,21 @@
+import { useEvidence } from "../evidence/EvidenceContext";
+
 export interface EvidenceLinkProps {
   evidenceIds?: string[];
-  /** Future navigation hook — routing to the evidence panel arrives with
-   * the Request Detail screen. */
+  /** Override the default behavior (opening the shared evidence drawer). */
   onOpen?: (evidenceIds: string[]) => void;
   className?: string;
 }
 
 /** "Evidence: SOP-LOC-001" or "Evidence: 3" — renders nothing when there
- * is no evidence to show. */
+ * is no evidence to show. Clicking opens the shared evidence drawer
+ * (EvidenceProvider) unless an explicit handler is supplied. */
 export default function EvidenceLink({
   evidenceIds,
   onOpen,
   className,
 }: EvidenceLinkProps) {
+  const evidence = useEvidence();
   if (!evidenceIds || evidenceIds.length === 0) {
     return null;
   }
@@ -27,7 +30,9 @@ export default function EvidenceLink({
       type="button"
       className={["cf-meta-link", className].filter(Boolean).join(" ")}
       title={evidenceIds.join(", ")}
-      onClick={() => onOpen?.(evidenceIds)}
+      onClick={() =>
+        onOpen ? onOpen(evidenceIds) : evidence?.open(evidenceIds)
+      }
     >
       <svg
         className="cf-meta-link__icon"

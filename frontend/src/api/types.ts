@@ -444,3 +444,21 @@ export interface AuditEventFilters {
   /** Snake_case agent id or the exact official RFP name. */
   agent?: string;
 }
+
+export type EvidenceSourceType =
+  | "sop"
+  | "routing_rule"
+  | "deficiency_rule"
+  | "response_template"
+  | "taxonomy"
+  | "registry"
+  | "record"
+  | string;
+
+export interface EvidenceReference {
+  evidence_id: string;
+  source_type: EvidenceSourceType;
+  title: string;
+  snippet: string | null;
+  confidence: number;
+}
