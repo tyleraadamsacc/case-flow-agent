@@ -13,6 +13,14 @@ The prototype makes the six RFP agents first-class, visible workflow actors:
 **Indexing Agent, Triaging Agent, ETL Agent, Note Taking and Data Entry Agent,
 Text Content Agent, Automation Agent.**
 
+The six agents are implemented as named **Google ADK** agents
+(`backend/app/adk_agents/`), orchestrated in rail order by a
+`CaseFlowRootAgent` (ADK `Workflow` graph). ADK owns agent execution only;
+the FastAPI application layer owns APIs, repositories, approval policy, the
+audit service, governance metrics, and all finalization authority. ADK
+session state is an execution scratchpad — persisted records are the source
+of truth.
+
 ## Guardrails
 
 - Synthetic / mock data only. No real user data, no real law enforcement data, no real PII.
