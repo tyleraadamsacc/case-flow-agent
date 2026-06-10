@@ -1,6 +1,21 @@
 import { useEffect, useState } from "react";
 
+import AppShell from "./components/layout/AppShell";
+import TopBar from "./components/layout/TopBar";
+import Card from "./components/ui/Card";
+import Chip from "./components/ui/Chip";
+import DesignSystemPreview from "./pages/DesignSystemPreview";
+
 export default function App() {
+  // Routing proper arrives with the workflow screens; until then a plain
+  // pathname check exposes the design-system reference page.
+  if (window.location.pathname === "/design-system") {
+    return <DesignSystemPreview />;
+  }
+  return <Home />;
+}
+
+function Home() {
   const [backendStatus, setBackendStatus] = useState("checking…");
 
   useEffect(() => {
@@ -13,32 +28,23 @@ export default function App() {
   }, []);
 
   return (
-    <main
-      style={{
-        fontFamily: "system-ui, sans-serif",
-        margin: "4rem auto",
-        maxWidth: 640,
-        padding: "0 1rem",
-      }}
-    >
-      <p
-        style={{
-          background: "#fff3cd",
-          border: "1px solid #ffe69c",
-          borderRadius: 4,
-          padding: "0.5rem 0.75rem",
-        }}
+    <AppShell topBar={<TopBar title="Home" />}>
+      <Card
+        title="CaseFlow Agent"
+        subtitle="Human-led LERS request workflow prototype"
+        style={{ maxWidth: 640 }}
       >
-        Prototype — synthetic / mock data only. No production systems are connected.
-      </p>
-      <h1>CaseFlow Agent</h1>
-      <p>
-        Human-led LERS request workflow prototype. Application screens arrive in later PRs;
-        this page only verifies the frontend shell runs.
-      </p>
-      <p>
-        Backend: <strong>{backendStatus}</strong>
-      </p>
-    </main>
+        <p style={{ color: "var(--text-secondary)" }}>
+          Application screens arrive in later PRs; this page only verifies the
+          frontend shell runs.
+        </p>
+        <div className="cf-preview__row">
+          <Chip tone={backendStatus === "connected" ? "green" : "amber"} dot>
+            Backend: {backendStatus}
+          </Chip>
+          <a href="/design-system">Design system reference</a>
+        </div>
+      </Card>
+    </AppShell>
   );
 }
