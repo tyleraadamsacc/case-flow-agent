@@ -1,0 +1,10 @@
+.git
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+.env.local
+*.log
+caseflow_codex_handoff_docs_v3_six_agent_visibility
