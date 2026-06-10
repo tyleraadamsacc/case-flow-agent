@@ -59,28 +59,42 @@ caseflow_codex_handoff_docs_v3_six_agent_visibility/   source handoff documents
 CASEFLOW_APPLICATION_BUILD_PLAN_FOR_REVIEW.md          implementation plan and PR roadmap
 ```
 
-## Current state (PR 1)
+## Current state (PR 1 + PR 2 backend)
 
-PR 1 implements the deterministic application foundation the ADK agents plug
-into in PR 2:
+The deterministic backend is feature-complete for the demo workflow:
 
-- typed Pydantic domain models (`backend/app/models/`)
-- workflow state machine and code-enforced approval policy
-  (`backend/app/orchestration/`)
+- typed Pydantic domain models (`backend/app/models/`), workflow state
+  machine, and code-enforced approval policy (`backend/app/orchestration/`)
 - single-path audit service over an append-only local repository — an audit
-  write failure blocks the state transition
-- local JSON repositories (legal requests, audit, response records, storage)
-- deterministic request extraction (strips LERS-template placeholder text),
-  special-handling checker, and deficiency detection
-- six seeded synthetic scenarios (A–F) and an idempotent mock-data loader
-- APIs: request queue/detail/intake, extract, validate, review, approve,
-  escalate, send-to-qa (internal handoff only), audit timeline, global audit
-  query, and a minimal governance summary
+  write failure blocks the state transition (and agent-run persistence)
+- **six-agent deterministic ADK workflow**: each agent reads context from
+  ADK session state (scratchpad only), produces a typed structured output,
+  and the execution bridge (`orchestration/agent_execution_service.py`)
+  persists one `AgentRun` + exactly one audit event per run — blocked runs
+  included. The agent-run repository, never session state, feeds the API.
+- eight seeded synthetic scenarios (A–F plus regulator/sensitive-sender and
+  low-confidence) and an idempotent mock-data loader
+- response package / no-records / deficiency-response / SME-notification
+  drafting per the Template LERS Response structure — all drafts are
+  type-constrained to pending-human statuses
+- local evidence retrieval (`GET /api/evidence`) resolving every stable
+  evidence id the agents emit
+- APIs: request queue/detail (incl. `agent_runs`), extract, validate,
+  `agents/run` (full rail), agent-runs, responsive-records, production
+  package + deficiency drafting, review/approve/escalate/send-to-qa, audit
+  timeline + global query (`?agent=` filter), and governance: summary,
+  agent-activity (RFP Agent Coverage), work-needing-attention,
+  product-volume, processing-time-by-product, bottlenecks, audit-readiness,
+  response-package-status
+- twelve golden scenarios (`make test-golden`) and a backend demo runner
+  (`make demo-scenario-a`)
+- Gemini *preparation* scaffolding only (`backend/app/llm/`): MockModelClient,
+  config-driven ModelRouter, structured-output validation — no live model
+  integration exists and no `google-genai` dependency is declared
 
-Intentionally deferred to PR 2+: the deterministic six-agent ADK workflow,
-`AgentRun` persistence, agent-run/agent-activity endpoints, response package
-and deficiency-response drafting, Gemini, retrieval/Agent Search, GCP
-adapters, and the frontend workflow screens.
+Intentionally deferred: Gemini-backed agent behavior (PR 8), Agent
+Search/Firestore/Cloud Storage adapters (PR 10), and the frontend workflow
+screens (PR 6–7).
 
 ## Roadmap
 

@@ -24,6 +24,7 @@ class AuditAction(StrEnum):
     NOTE_DRAFTED = "note_drafted"
     PRODUCTION_PACKAGE_DRAFTED = "production_package_drafted"
     DEFICIENCY_RESPONSE_DRAFTED = "deficiency_response_drafted"
+    SME_NOTIFICATION_DRAFTED = "sme_notification_drafted"
     WORKFLOW_ACTION_PREPARED = "workflow_action_prepared"
     QA_VALIDATION_COMPLETED = "qa_validation_completed"
     ANALYST_REVIEWED = "analyst_reviewed"
@@ -33,6 +34,18 @@ class AuditAction(StrEnum):
     SENT_TO_QA = "sent_to_qa"
     FINALIZATION_BLOCKED = "finalization_blocked"
     AUDIT_COMPLETED = "audit_completed"
+
+
+class AgentRunStatus(StrEnum):
+    """Status of one agent execution. Blocked runs stay visible — an agent
+    that cannot proceed reports why instead of disappearing."""
+
+    WAITING = "waiting"
+    RUNNING = "running"
+    COMPLETE = "complete"
+    BLOCKED = "blocked"
+    NEEDS_REVIEW = "needs_review"
+    FAILED = "failed"
 
 
 class LegalProcessType(StrEnum):
@@ -95,6 +108,7 @@ class ReviewReason(StrEnum):
     MISSING_OR_INVALID_DATE_RANGE = "missing_or_invalid_date_range"
     LOW_CLASSIFICATION_CONFIDENCE = "low_classification_confidence"
     SOP_CONFLICT = "sop_conflict"
+    SENSITIVE_PARTY = "sensitive_party"
     PRODUCTION_PACKAGE_DRAFTED = "production_package_drafted"
     DEFICIENCY_RESPONSE_DRAFTED = "deficiency_response_drafted"
     CHAIN_OF_CUSTODY_GENERATED = "chain_of_custody_generated"

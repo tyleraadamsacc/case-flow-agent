@@ -8,8 +8,10 @@ from fastapi import Request
 from app.config import Settings
 from app.mock_data.seed import seed_legal_requests
 from app.models.enums import ActorType
+from app.orchestration.agent_execution_service import AgentExecutionService
 from app.orchestration.approval_policy import ApprovalPolicy
 from app.orchestration.workflow_state_machine import WorkflowStateMachine
+from app.repositories.local_agent_run_repository import LocalAgentRunRepository
 from app.repositories.local_audit_repository import LocalAuditRepository
 from app.repositories.local_legal_request_repository import LocalLegalRequestRepository
 from app.repositories.local_response_record_repository import LocalResponseRecordRepository
@@ -19,6 +21,7 @@ from app.services.deficiency_service import DeficiencyService
 from app.services.governance_metrics_service import GovernanceMetricsService
 from app.services.request_extraction_service import RequestExtractionService
 from app.services.sensitive_special_handling_service import SensitiveSpecialHandlingService
+from app.services.sop_retrieval_service import LocalSopRetrievalService
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,7 @@ class Container:
 
         self.legal_request_repository = LocalLegalRequestRepository()
         self.audit_repository = LocalAuditRepository()
+        self.agent_run_repository = LocalAgentRunRepository()
         self.response_record_repository = LocalResponseRecordRepository(
             mock_dir / "response_records"
         )
@@ -50,8 +54,19 @@ class Container:
             mock_dir / "sop" / "special_handling_rules.json"
         )
         self.deficiency_service = DeficiencyService(mock_dir / "sop" / "deficiency_rules.json")
+        self.retrieval_service = LocalSopRetrievalService(mock_dir)
         self.governance_service = GovernanceMetricsService(
-            self.legal_request_repository, self.audit_repository, self.approval_policy
+            self.legal_request_repository,
+            self.audit_repository,
+            self.approval_policy,
+            self.agent_run_repository,
+        )
+        self.agent_execution_service = AgentExecutionService(
+            self.legal_request_repository,
+            self.agent_run_repository,
+            self.response_record_repository,
+            self.audit_service,
+            mock_data_dir=mock_dir,
         )
 
     def seed(self) -> int:
