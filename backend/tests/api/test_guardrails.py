@@ -3,6 +3,8 @@ production write-back adapters, no Gemini integration, no credentials."""
 
 from pathlib import Path
 
+import pytest
+
 APP_DIR = Path(__file__).resolve().parents[2] / "app"
 
 FORBIDDEN_PATH_FRAGMENTS = ("send-final", "send_final", "release", "disclose", "transmit")
@@ -33,9 +35,22 @@ def test_agent_visibility_endpoints_exist(app):
 
 
 def test_no_production_write_back_adapters_exist():
+    # §4 guardrail 6: no adapters that write to production Google systems
+    # (LERS, Cases, email, production data stores). The prototype's OWN
+    # persistence skeletons (Firestore/GCS, plan §19 PR 10) are allowed —
+    # but they must be inert: every method raises until post-MVP wiring.
     repository_modules = {p.name for p in (APP_DIR / "repositories").glob("*.py")}
-    for forbidden in ("firestore", "cloud_storage", "bigquery", "lers", "cases"):
+    for forbidden in ("lers", "cases", "email", "bigquery", "write_back"):
         assert not any(forbidden in name for name in repository_modules), repository_modules
+
+    from app.gcp import GcpAdapterNotReadyError
+    from app.repositories.firestore_legal_request_repository import (
+        FirestoreLegalRequestRepository,
+    )
+
+    skeleton = FirestoreLegalRequestRepository.__new__(FirestoreLegalRequestRepository)
+    with pytest.raises(GcpAdapterNotReadyError):
+        skeleton.save(None)  # type: ignore[arg-type] — inert before any validation
 
 
 def test_model_invocation_only_inside_the_single_wrapper():

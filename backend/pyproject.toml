@@ -16,6 +16,13 @@ dependencies = [
 gemini = [
     "google-genai>=1.0",
 ]
+# GCP persistence/retrieval adapters (post-MVP skeletons). Local mode
+# never needs these.
+gcp = [
+    "google-cloud-firestore>=2.16",
+    "google-cloud-storage>=2.16",
+    "google-cloud-discoveryengine>=0.11",
+]
 dev = [
     "pytest>=8.0",
     "httpx>=0.27",

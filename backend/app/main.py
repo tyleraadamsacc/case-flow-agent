@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.deps import Container
 from app.api.routes.agent_runs import router as agent_runs_router
@@ -49,6 +50,27 @@ def create_app(
     app.include_router(audit_router)
     app.include_router(evidence_router)
     app.include_router(governance_router)
+
+    # Container image mode: serve the built SPA next to the API. Local
+    # development keeps using the Vite dev server; this never activates
+    # unless CASEFLOW_STATIC_DIR points at a build output.
+    static_dir = settings.static_dir
+    if static_dir is not None and static_dir.is_dir():
+        assets = static_dir / "assets"
+        if assets.is_dir():
+            app.mount("/assets", StaticFiles(directory=assets), name="assets")
+        index_file = static_dir / "index.html"
+
+        @app.get("/{spa_path:path}", include_in_schema=False)
+        def spa_fallback(spa_path: str) -> FileResponse:
+            candidate = (static_dir / spa_path).resolve()
+            if (
+                spa_path
+                and candidate.is_file()
+                and candidate.is_relative_to(static_dir.resolve())
+            ):
+                return FileResponse(candidate)
+            return FileResponse(index_file)
 
     @app.middleware("http")
     async def correlation_id_middleware(request: Request, call_next):
