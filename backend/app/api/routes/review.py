@@ -30,16 +30,9 @@ from app.models.enums import (
 from app.models.human_review import HumanReview
 from app.models.legal_request import LegalRequest
 from app.models.workflow_state import WorkflowState
+from app.services.audit_service import REQUIRED_EVENTS_FOR_FINALIZATION
 
 router = APIRouter(prefix="/api/legal-requests", tags=["review"])
-
-# Audit events that must exist before a request may reach audit_complete.
-REQUIRED_EVENTS_FOR_FINALIZATION: set[AuditAction] = {
-    AuditAction.REQUEST_INGESTED,
-    AuditAction.REQUEST_EXTRACTED,
-    AuditAction.SPECIAL_HANDLING_CHECKED,
-    AuditAction.ROUTE_APPROVED,
-}
 
 
 def _load(container: Container, legal_request_id: str) -> LegalRequest:

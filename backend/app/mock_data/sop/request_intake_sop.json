@@ -1,0 +1,40 @@
+{
+  "sop_entries": [
+    {
+      "sop_id": "SOP-REQUEST-INTAKE-LOCATION",
+      "title": "Location data request intake (synthetic SOP)",
+      "snippet": "Location data requests (GPS, cell, Wi-Fi, semantic location) require a search warrant or equivalent court order and analyst review before any production step.",
+      "match": {"product_domain": "Maps / Location"}
+    },
+    {
+      "sop_id": "SOP-SUBSCRIBER-INFO",
+      "title": "Subscriber information request intake (synthetic SOP)",
+      "snippet": "Basic subscriber information may be requested by legal process; verify identifiers and requested period at intake.",
+      "match": {"product_domain": "Account / Subscriber"}
+    },
+    {
+      "sop_id": "SOP-PEN-REGISTER-TT",
+      "title": "Pen register / trap and trace handling (synthetic SOP)",
+      "snippet": "Pen register and trap-and-trace orders are always SME-review matters; verify ex parte authorization, duration, and reporting cadence.",
+      "match": {"any_flag": ["pen_register_requested", "trap_and_trace_requested"]}
+    },
+    {
+      "sop_id": "SOP-NON-DISCLOSURE",
+      "title": "Non-disclosure and sealed matter handling (synthetic SOP)",
+      "snippet": "Non-disclosure, sealed, and no-adverse-action requirements must be flagged at intake and enforced through the full request lifecycle.",
+      "match": {"any_flag": ["non_disclosure_to_subscriber", "sealed", "no_adverse_action"]}
+    },
+    {
+      "sop_id": "SOP-CONTENT-PRODUCTION",
+      "title": "Content production handling (synthetic SOP)",
+      "snippet": "Content requests (email bodies, files, media, voice) carry high sensitivity and require SME-aware routing.",
+      "match": {"any_flag": ["content_requested", "tombstone_requested"]}
+    },
+    {
+      "sop_id": "SOP-OVERBROAD-SCOPE",
+      "title": "Overbroad scope assessment (synthetic SOP)",
+      "snippet": "Requests spanning three or more product domains are presumptively overbroad and require SME scope review before any retrieval.",
+      "match": {"overbroad": true}
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "legal_request_id": "LER-2026-004888",
+  "scenario": "H",
+  "source_type": "lers_request_template",
+  "date_received": "2026-06-08",
+  "raw_source_uri": "local://legal_requests/scenario_h_low_confidence_classification.json",
+  "raw_source_text": "RE: REQUEST FOR RECORDS — [INSTRUCTIONS — PLEASE DELETE] To: Google LLC, Google Legal Investigations Support (LERS). Please provide any available records for account user.synthetic.h@example.com for the period 2026-04-15 through 2026-05-15. The attached authorization paperwork is partially illegible and the instrument type could not be determined at intake. SYNTHETIC DATA — NOT A REAL LEGAL DOCUMENT.",
+  "extracted_fields": {
+    "legal_process": {
+      "type": "unknown",
+      "court_order_included": false,
+      "ex_parte_order": false,
+      "pen_register": false,
+      "trap_and_trace": false,
+      "location_tracking": false,
+      "stored_communications": false
+    },
+    "requesting_agency": {
+      "agency": "Brazos County Sheriff's Office (Synthetic)",
+      "case_number": "MC-26-70552",
+      "officer": "Investigator Carla Munoz",
+      "contact_email": "synthetic.investigator@example.gov",
+      "phone": "555-0108"
+    },
+    "subject_identifiers": [
+      {
+        "type": "gmail_account",
+        "value": "user.synthetic.h@example.com",
+        "confidence": 0.98,
+        "source_span": "account user.synthetic.h@example.com"
+      }
+    ],
+    "requested_data_categories": [
+      {
+        "category": "Subscriber Information",
+        "product_domain": "Account / Subscriber",
+        "sensitivity": "medium",
+        "content_type": "subscriber",
+        "requires_sme_review": false
+      }
+    ],
+    "product_domains": ["Account / Subscriber"],
+    "requested_period": {
+      "start": "2026-04-15T00:00:00Z",
+      "end": "2026-05-15T23:59:59Z"
+    },
+    "special_handling": {
+      "sealed": false,
+      "non_disclosure_to_subscriber": false,
+      "no_adverse_action": false,
+      "pen_register_requested": false,
+      "trap_and_trace_requested": false,
+      "ongoing_access_requested": false,
+      "location_tracking_requested": false,
+      "content_requested": false,
+      "tombstone_requested": false,
+      "production_deadline_days": 35,
+      "service_deadline_days": 14
+    },
+    "legal_authorities": []
+  }
+}

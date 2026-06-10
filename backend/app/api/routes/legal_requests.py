@@ -68,7 +68,15 @@ def create_legal_request(
 def get_legal_request(
     legal_request_id: str, container: Container = Depends(get_container)
 ) -> LegalRequest:
-    return _load(container, legal_request_id)
+    request = _load(container, legal_request_id)
+    # Hydrate the latest run per agent from the agent-run repository (the
+    # source of truth for runs); list order is execution order, so later
+    # runs win.
+    request.agent_runs = {
+        run.agent_id: run
+        for run in container.agent_run_repository.list_for_request(legal_request_id)
+    }
+    return request
 
 
 @router.post("/{legal_request_id}/extract")

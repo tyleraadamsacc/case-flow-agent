@@ -6,7 +6,6 @@ from pathlib import Path
 APP_DIR = Path(__file__).resolve().parents[2] / "app"
 
 FORBIDDEN_PATH_FRAGMENTS = ("send-final", "send_final", "release", "disclose", "transmit")
-PR2_PATHS = ("/agents/run", "/agent-runs", "/governance/agent-activity")
 
 
 def all_route_paths(app) -> list[str]:
@@ -26,10 +25,11 @@ def test_explicitly_forbidden_endpoints_do_not_exist(app):
     assert "/release-production" not in paths
 
 
-def test_pr2_agent_endpoints_are_not_implemented_yet(app):
-    for path in all_route_paths(app):
-        for pr2_fragment in PR2_PATHS:
-            assert pr2_fragment not in path
+def test_agent_visibility_endpoints_exist(app):
+    paths = all_route_paths(app)
+    assert "/api/legal-requests/{legal_request_id}/agent-runs" in paths
+    assert "/api/legal-requests/{legal_request_id}/agents/run" in paths
+    assert "/api/governance/agent-activity" in paths
 
 
 def test_no_production_write_back_adapters_exist():
