@@ -1,0 +1,75 @@
+{
+  "legal_request_id": "LER-2026-004850",
+  "scenario": "E",
+  "source_type": "lers_request_template",
+  "date_received": "2026-06-05",
+  "raw_source_uri": "local://legal_requests/scenario_e_subscriber_info_common.json",
+  "raw_source_text": "LEGAL PROCESS REQUEST — [INSTRUCTIONS — PLEASE DELETE] To: Google LLC, Google Legal Investigations Support (LERS). Request for basic subscriber information and account creation records for account user.synthetic.e@example.com for the period 2026-04-01 through 2026-05-31. SYNTHETIC DATA — NOT A REAL LEGAL DOCUMENT.",
+  "extracted_fields": {
+    "legal_process": {
+      "type": "legal_process_request",
+      "court_order_included": false,
+      "ex_parte_order": false,
+      "pen_register": false,
+      "trap_and_trace": false,
+      "location_tracking": false,
+      "stored_communications": false
+    },
+    "requesting_agency": {
+      "agency": "City of Lakewood Police Department (Synthetic)",
+      "case_number": "MC-26-50233",
+      "officer": "Officer James Whitfield",
+      "contact_email": "synthetic.records@example.gov",
+      "phone": "555-0105"
+    },
+    "subject_identifiers": [
+      {
+        "type": "gmail_account",
+        "value": "user.synthetic.e@example.com",
+        "confidence": 0.99,
+        "source_span": "account user.synthetic.e@example.com"
+      }
+    ],
+    "requested_data_categories": [
+      {
+        "category": "Subscriber Information",
+        "product_domain": "Account / Subscriber",
+        "sensitivity": "medium",
+        "content_type": "subscriber",
+        "requires_sme_review": false
+      },
+      {
+        "category": "Account Creation and Login Records",
+        "product_domain": "Account / Subscriber",
+        "sensitivity": "medium",
+        "content_type": "subscriber",
+        "requires_sme_review": false
+      }
+    ],
+    "product_domains": ["Account / Subscriber"],
+    "requested_period": {
+      "start": "2026-04-01T00:00:00Z",
+      "end": "2026-05-31T23:59:59Z"
+    },
+    "special_handling": {
+      "sealed": false,
+      "non_disclosure_to_subscriber": false,
+      "no_adverse_action": false,
+      "pen_register_requested": false,
+      "trap_and_trace_requested": false,
+      "ongoing_access_requested": false,
+      "location_tracking_requested": false,
+      "content_requested": false,
+      "tombstone_requested": false,
+      "production_deadline_days": 35,
+      "service_deadline_days": 14
+    },
+    "legal_authorities": [
+      {
+        "citation": "18 U.S.C. §2703(c)(2)",
+        "description": "Basic subscriber information disclosure",
+        "source_span": "Request for basic subscriber information"
+      }
+    ]
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "domains": [
+    {"domain_id": "TAX-ACCOUNT-SUBSCRIBER", "name": "Account / Subscriber", "description": "Subscriber information, account creation, and login records.", "default_queue": "Subscriber Records Review", "sensitivity_default": "medium"},
+    {"domain_id": "TAX-GMAIL", "name": "Gmail", "description": "Email contents and metadata.", "default_queue": "Content Response Review", "sensitivity_default": "high"},
+    {"domain_id": "TAX-ANDROID", "name": "Android", "description": "Device, web, and app activity.", "default_queue": "Activity Response Review", "sensitivity_default": "high"},
+    {"domain_id": "TAX-YOUTUBE", "name": "YouTube", "description": "Search, watch, comment, and stories activity.", "default_queue": "Activity Response Review", "sensitivity_default": "high"},
+    {"domain_id": "TAX-MAPS-LOCATION", "name": "Maps / Location", "description": "GPS, cell, Wi-Fi, and semantic location history.", "default_queue": "Location Response Review", "sensitivity_default": "high"},
+    {"domain_id": "TAX-VOICE", "name": "Google Voice", "description": "Call detail records, SMS/MMS, voicemail.", "default_queue": "Content Response Review", "sensitivity_default": "high"},
+    {"domain_id": "TAX-DRIVE", "name": "Drive / Docs / Sheets / Slides", "description": "Files created, shared, or downloaded.", "default_queue": "Content Response Review", "sensitivity_default": "high"},
+    {"domain_id": "TAX-PHOTOS", "name": "Photos / Videos", "description": "Stored and captured media and metadata.", "default_queue": "Content Response Review", "sensitivity_default": "high"},
+    {"domain_id": "TAX-PAY", "name": "Pay / Payments", "description": "Payment methods, purchase history, subscriptions.", "default_queue": "Financial Records Review", "sensitivity_default": "high"},
+    {"domain_id": "TAX-CALENDAR", "name": "Calendar", "description": "Calendars, entries, notes, alerts, invites.", "default_queue": "Content Response Review", "sensitivity_default": "medium"},
+    {"domain_id": "TAX-CONTACTS", "name": "Contacts", "description": "Names, phone numbers, emails, social links.", "default_queue": "Subscriber Records Review", "sensitivity_default": "medium"},
+    {"domain_id": "TAX-CLOUD-ONE", "name": "Google Cloud / Google One", "description": "Data collected in connection with associated devices.", "default_queue": "Content Response Review", "sensitivity_default": "high"},
+    {"domain_id": "TAX-CHROMEBOOK", "name": "Chromebook", "description": "Data collected from associated Chromebook devices.", "default_queue": "Activity Response Review", "sensitivity_default": "medium"},
+    {"domain_id": "TAX-TOMBSTONE", "name": "Tombstone archive", "description": "Deleted account data archive.", "default_queue": "SME Review", "sensitivity_default": "high"}
+  ]
+}
