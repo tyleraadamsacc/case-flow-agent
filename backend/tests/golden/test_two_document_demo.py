@@ -95,8 +95,41 @@ def test_two_document_flow_blocks_then_human_approval_unlocks_production(demo_cl
     custody = package["chain_of_custody"]
     assert custody["collected_by"] == "Legal Response Operations Team"
 
-    # Human finalization completes the audit.
-    approve = demo_client.post(f"/api/legal-requests/{REQUEST_ID}/approve", json={})
+    # Human finalization (theme B + E): this warrant is high sensitivity,
+    # so finalization needs every attestation plus two distinct approvers,
+    # at least one senior.
+    status = demo_client.get(
+        f"/api/legal-requests/{REQUEST_ID}/finalization-status"
+    ).json()
+    assert status["approvals_required"] == 2
+    assert status["requires_senior_approval"] is True
+    for item in status["required_attestations"]:
+        attested = demo_client.post(
+            f"/api/legal-requests/{REQUEST_ID}/attest", json={"item": item}
+        )
+        assert attested.status_code == 200, attested.text
+
+    # First approval (the analyst) records but awaits a co-signer.
+    first = demo_client.post(f"/api/legal-requests/{REQUEST_ID}/approve", json={})
+    assert first.status_code == 200, first.text
+    assert first.json()["finalized"] is False
+    assert first.json()["awaiting_approval"] is True
+
+    # A second non-senior reviewer cannot finalize a high-sensitivity request.
+    refused = demo_client.post(
+        f"/api/legal-requests/{REQUEST_ID}/approve",
+        json={},
+        headers={"X-CaseFlow-Actor": "analyst.two", "X-CaseFlow-Role": "analyst"},
+    )
+    assert refused.status_code == 403
+
+    # A senior analyst co-signs and the audit completes.
+    approve = demo_client.post(
+        f"/api/legal-requests/{REQUEST_ID}/approve",
+        json={},
+        headers={"X-CaseFlow-Actor": "senior.local", "X-CaseFlow-Role": "senior_analyst"},
+    )
     assert approve.status_code == 200, approve.text
     assert approve.json()["finalized"] is True
+    assert approve.json()["approvals_recorded"] == 2
     assert approve.json()["legal_request"]["workflow_state"] == "audit_complete"

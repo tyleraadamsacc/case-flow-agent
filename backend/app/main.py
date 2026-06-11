@@ -15,10 +15,12 @@ from app.config import Settings
 from app.errors import (
     AgentExecutionStateError,
     AuditWriteError,
+    AuthorizationError,
     FinalizationBlockedError,
     InvalidStateTransitionError,
     NotFoundError,
 )
+from app.orchestration.override_service import OverrideError
 from app.logging_config import new_correlation_id, setup_logging
 
 
@@ -111,6 +113,17 @@ def create_app(
             status_code=409,
             content={"detail": str(exc), "state": exc.state.value},
         )
+
+    @app.exception_handler(AuthorizationError)
+    async def authorization_handler(request: Request, exc: AuthorizationError):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": str(exc), "allowed_roles": exc.allowed},
+        )
+
+    @app.exception_handler(OverrideError)
+    async def override_error_handler(request: Request, exc: OverrideError):
+        return JSONResponse(status_code=422, content={"detail": str(exc)})
 
     @app.exception_handler(AuditWriteError)
     async def audit_write_handler(request: Request, exc: AuditWriteError):

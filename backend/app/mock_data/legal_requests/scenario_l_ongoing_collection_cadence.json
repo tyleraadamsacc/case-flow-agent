@@ -1,0 +1,71 @@
+{
+  "legal_request_id": "LER-2026-004934",
+  "scenario": "L",
+  "source_type": "lers_request_template",
+  "date_received": "2026-06-10",
+  "raw_source_uri": "local://legal_requests/scenario_l_ongoing_collection_cadence.json",
+  "raw_source_text": "EX PARTE COURT ORDER - PEN REGISTER / TRAP AND TRACE. To: Google LLC, Google Legal Investigations Support (LERS). The order authorizes non-content routing and signaling information for account user.synthetic.l@example.com for 45 days, with ongoing collection updates every 30 minutes, pursuant to 18 U.S.C. §§3122 and 3123. The order is sealed and non-disclosure to the subscriber is required for 180 days. SYNTHETIC DATA - NOT A REAL LEGAL DOCUMENT.",
+  "extracted_fields": {
+    "legal_process": {
+      "type": "ex_parte_order",
+      "court_order_included": true,
+      "ex_parte_order": true,
+      "pen_register": true,
+      "trap_and_trace": true,
+      "location_tracking": false,
+      "stored_communications": false
+    },
+    "requesting_agency": {
+      "agency": "King County Prosecuting Attorney Special Operations (Synthetic)",
+      "case_number": "MC-26-80634",
+      "officer": "Investigator Noah Kim",
+      "contact_email": "synthetic.specialops@example.gov",
+      "phone": "555-0114"
+    },
+    "subject_identifiers": [
+      {
+        "type": "gmail_account",
+        "value": "user.synthetic.l@example.com",
+        "confidence": 0.99,
+        "source_span": "account user.synthetic.l@example.com"
+      }
+    ],
+    "requested_data_categories": [
+      {
+        "category": "Dialing / Routing / Addressing / Signaling Information",
+        "product_domain": "Account / Subscriber",
+        "sensitivity": "high",
+        "content_type": "non_content_metadata",
+        "requires_sme_review": true
+      }
+    ],
+    "product_domains": ["Account / Subscriber"],
+    "requested_period": {
+      "start": "2026-06-10T00:00:00Z",
+      "end": "2026-07-25T23:59:59Z"
+    },
+    "special_handling": {
+      "sealed": true,
+      "non_disclosure_to_subscriber": true,
+      "no_adverse_action": false,
+      "pen_register_requested": true,
+      "trap_and_trace_requested": true,
+      "ongoing_access_requested": true,
+      "location_tracking_requested": false,
+      "content_requested": false,
+      "tombstone_requested": false,
+      "production_deadline_days": null,
+      "service_deadline_days": 14,
+      "ongoing_duration_days": 45,
+      "ongoing_update_interval_minutes": 30,
+      "nondisclosure_period": "180_days"
+    },
+    "legal_authorities": [
+      {
+        "citation": "18 U.S.C. §§3122 and 3123",
+        "description": "Pen register and trap and trace authorization",
+        "source_span": "pursuant to 18 U.S.C. §§3122 and 3123"
+      }
+    ]
+  }
+}

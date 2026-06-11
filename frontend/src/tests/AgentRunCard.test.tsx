@@ -29,7 +29,7 @@ describe("AgentRunCard", () => {
     expect(screen.getByText("94% confidence")).toBeInTheDocument();
     expect(screen.getByRole("meter")).toHaveAccessibleName("Confidence 94%");
     expect(screen.getByText("Evidence: 2")).toBeInTheDocument();
-    expect(screen.getByText("Audit: request_classified")).toBeInTheDocument();
+    expect(screen.getByText("Audit: Request classified")).toBeInTheDocument();
     expect(screen.getByText("Human review required")).toBeInTheDocument();
   });
 

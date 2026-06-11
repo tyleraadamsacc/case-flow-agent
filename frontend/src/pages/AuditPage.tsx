@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { governanceApi } from "../api/client";
@@ -11,6 +11,16 @@ import { OFFICIAL_AGENT_NAMES, agentTheme } from "../theme/agentTheme";
 import { formatDateTime, humanizeToken } from "../lib/requestDisplay";
 
 const ACTOR_TYPES = ["system", "agent", "service", "human"] as const;
+
+const AUDIT_LABELS: Record<string, string> = {
+  analyst_approved: "Analyst review recorded",
+  approved_by_analyst: "Analyst review recorded",
+  sent_to_qa: "Pending QA review",
+  draft_pending_approval: "Draft pending approval",
+  draft_pending_analyst_review: "Draft pending analyst review",
+  draft_not_final: "Draft, not final",
+  synthetic_mock: "Synthetic / mock",
+};
 
 const MONTHS = [
   "January",
@@ -46,6 +56,39 @@ function actorTone(actorType: AuditEvent["actor_type"]) {
   }
 }
 
+function eventIcon(event: AuditEvent): string {
+  if (
+    event.before_state !== null &&
+    event.after_state !== null &&
+    event.before_state !== event.after_state
+  ) {
+    return "S";
+  }
+  switch (event.actor_type) {
+    case "agent":
+      return "A";
+    case "human":
+      return "H";
+    case "service":
+      return "V";
+    default:
+      return "Y";
+  }
+}
+
+function actorLabel(event: AuditEvent): string {
+  return event.actor_type === "agent"
+    ? humanizeToken(event.actor_id)
+    : `${humanizeToken(event.actor_type)} · ${humanizeToken(event.actor_id)}`;
+}
+
+function auditLabel(value: string | null): string {
+  if (value === null) {
+    return "None";
+  }
+  return AUDIT_LABELS[value] ?? humanizeToken(value);
+}
+
 function TimelineEvent({ event }: { event: AuditEvent }) {
   const [open, setOpen] = useState(false);
   const stateChanged =
@@ -60,23 +103,27 @@ function TimelineEvent({ event }: { event: AuditEvent }) {
 
   return (
     <li className="cf-timeline__event">
-      <span
-        className={`cf-timeline__dot cf-timeline__dot--${event.actor_type}`}
-        style={accent ? { background: accent } : undefined}
-        aria-hidden="true"
-      />
+      <div className="cf-timeline__marker" aria-hidden="true">
+        <span
+          className={`cf-timeline__dot cf-timeline__dot--${event.actor_type}`}
+          style={accent ? { background: accent } : undefined}
+        />
+        <span className="cf-timeline__icon">{eventIcon(event)}</span>
+      </div>
       <div className="cf-timeline__body">
         <div className="cf-timeline__head">
           <span className="cf-timeline__time">
             {formatDateTime(event.timestamp)}
           </span>
-          <Chip tone={actorTone(event.actor_type)} title={event.actor_type}>
-            {event.actor_type === "agent"
-              ? humanizeToken(event.actor_id)
-              : humanizeToken(event.actor_id)}
+          <Chip
+            tone={actorTone(event.actor_type)}
+            title={humanizeToken(event.actor_type)}
+            className="cf-audit__actor-chip"
+          >
+            {actorLabel(event)}
           </Chip>
           <span className="cf-timeline__action">
-            {humanizeToken(event.action)}
+            {auditLabel(event.action)}
           </span>
           <Link
             className="cf-timeline__request"
@@ -85,13 +132,17 @@ function TimelineEvent({ event }: { event: AuditEvent }) {
             {event.legal_request_id}
           </Link>
         </div>
-        <p className="cf-timeline__summary">{event.summary}</p>
-        <div className="cf-preview__row">
+        <p className="cf-timeline__summary cf-timeline__summary--clamp">
+          {event.summary}
+        </p>
+        <div className="cf-preview__row cf-audit__event-meta">
           {stateChanged ? (
-            <Chip tone="blue">
-              {humanizeToken(event.before_state ?? "")} →{" "}
-              {humanizeToken(event.after_state ?? "")}
+            <Chip tone="blue" className="cf-audit__state-chip">
+              {auditLabel(event.before_state)} to {auditLabel(event.after_state)}
             </Chip>
+          ) : null}
+          {event.confidence !== null ? (
+            <Chip tone="neutral">{Math.round(event.confidence * 100)}% confidence</Chip>
           ) : null}
           <EvidenceLink evidenceIds={event.evidence_ids} />
           <button
@@ -111,9 +162,7 @@ function TimelineEvent({ event }: { event: AuditEvent }) {
             </div>
             <div>
               <dt>State</dt>
-              <dd>
-                {event.before_state ?? "none"} → {event.after_state ?? "none"}
-              </dd>
+              <dd>{auditLabel(event.before_state)} to {auditLabel(event.after_state)}</dd>
             </div>
             {event.confidence !== null ? (
               <div>
@@ -157,6 +206,41 @@ export default function AuditPage() {
       .catch((cause: Error) => setError(cause.message));
   }, [agent, actorType, requestId]);
 
+  const summary = useMemo(() => {
+    const source = events ?? [];
+    const transitionCount = source.filter(
+      (event) =>
+        event.before_state !== null &&
+        event.after_state !== null &&
+        event.before_state !== event.after_state,
+    ).length;
+    const agentCount = source.filter((event) => event.actor_type === "agent").length;
+    const humanCount = source.filter((event) => event.actor_type === "human").length;
+    const evidenceCount = source.reduce(
+      (count, event) => count + event.evidence_ids.length,
+      0,
+    );
+
+    return [
+      { label: "Visible events", value: source.length, detail: "matching current filters" },
+      {
+        label: "Agent actions",
+        value: agentCount,
+        detail: `${humanCount} human action${humanCount === 1 ? "" : "s"}`,
+      },
+      {
+        label: "State changes",
+        value: transitionCount,
+        detail: "workflow transitions in view",
+      },
+      {
+        label: "Evidence links",
+        value: evidenceCount,
+        detail: "supporting records attached",
+      },
+    ];
+  }, [events]);
+
   return (
     <ConsoleShell title="Audit">
       <div className="cf-page-header">
@@ -168,7 +252,17 @@ export default function AuditPage() {
         </p>
       </div>
 
-      <div className="cf-toolbar cf-toolbar--wrap">
+      <div className="cf-audit__summary-grid" aria-label="Audit summary">
+        {summary.map((item) => (
+          <Card key={item.label} variant="soft" className="cf-audit__summary-card">
+            <span>{item.label}</span>
+            <strong>{events === null && !error ? "..." : item.value}</strong>
+            <p>{item.detail}</p>
+          </Card>
+        ))}
+      </div>
+
+      <div className="cf-toolbar cf-toolbar--wrap cf-audit__filters">
         <label className="cf-filter">
           <span className="cf-fields__label">Agent</span>
           <select
@@ -242,7 +336,7 @@ export default function AuditPage() {
       ) : null}
 
       {events && events.length > 0 ? (
-        <Card>
+        <Card className="cf-audit__timeline-card">
           <ol className="cf-timeline">
             {events.map((event, index) => {
               const label = dayLabel(event.timestamp);

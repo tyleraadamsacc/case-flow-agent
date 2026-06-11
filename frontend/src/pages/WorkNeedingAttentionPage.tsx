@@ -7,7 +7,11 @@ import ConsoleShell from "../components/layout/ConsoleShell";
 import Card from "../components/ui/Card";
 import Chip from "../components/ui/Chip";
 import StatusBadge from "../components/ui/StatusBadge";
-import { humanizeToken } from "../lib/requestDisplay";
+import {
+  humanizeToken,
+  nextAction,
+  workflowStateLabel,
+} from "../lib/requestDisplay";
 
 function reasonTone(reason: string): "red" | "amber" | "violet" {
   if (
@@ -28,6 +32,36 @@ function reasonTone(reason: string): "red" | "amber" | "violet" {
     return "violet";
   }
   return "amber";
+}
+
+function responsibleAgentLabel(item: AttentionItem): string {
+  const text = item.reasons.join(" ");
+  if (text.includes("sme") || text.includes("escalation")) {
+    return "Triaging Agent";
+  }
+  if (text.includes("audit") || text.includes("approval")) {
+    return "Automation Agent";
+  }
+  if (text.includes("deficiency") || text.includes("missing")) {
+    return "Text Content Agent";
+  }
+  if (text.includes("etl") || text.includes("package")) {
+    return "ETL Agent";
+  }
+  return "CaseFlow analyst";
+}
+
+function recommendedAction(item: AttentionItem): string {
+  if (item.reasons.some((reason) => reason.includes("blocking"))) {
+    return "Clear or override the blocking deficiency";
+  }
+  if (item.reasons.some((reason) => reason.includes("sme"))) {
+    return "Review the prepared SME escalation";
+  }
+  if (item.reasons.some((reason) => reason.includes("audit"))) {
+    return "Inspect the audit trail before approval";
+  }
+  return nextAction(item.workflow_state);
 }
 
 /** Work Needing Attention — a curated, prioritized exception feed
@@ -89,44 +123,79 @@ export default function WorkNeedingAttentionPage() {
       ) : null}
 
       <div className="cf-attention">
-        {items?.map((item) => (
-          <Card
-            key={item.legal_request_id}
-            interactive
-            className="cf-attention__card"
-            onClick={() => navigate(`/requests/${item.legal_request_id}`)}
-            role="link"
-            tabIndex={0}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                navigate(`/requests/${item.legal_request_id}`);
-              }
-            }}
-          >
-            <div className="cf-attention__header">
-              <span className="cf-queue__id">{item.legal_request_id}</span>
-              <StatusBadge status={item.workflow_state} />
-              <Chip tone="neutral" title="Priority score">
-                P{item.priority}
-              </Chip>
-            </div>
-            <div className="cf-preview__row" style={{ marginTop: "var(--space-2)" }}>
-              {item.reasons.map((reason) => (
-                <Chip key={reason} tone={reasonTone(reason)} dot>
-                  {humanizeToken(reason)}
+        {items?.map((item) => {
+          const agentLabel = responsibleAgentLabel(item);
+          return (
+            <Card
+              key={item.legal_request_id}
+              interactive
+              className="cf-attention__card"
+              onClick={() => navigate(`/requests/${item.legal_request_id}`)}
+              role="link"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  navigate(`/requests/${item.legal_request_id}`);
+                }
+              }}
+            >
+              <div className="cf-attention__header">
+                <span className="cf-queue__id">{item.legal_request_id}</span>
+                <StatusBadge status={item.workflow_state} />
+                <Chip tone="neutral" title="Priority score">
+                  P{item.priority}
                 </Chip>
-              ))}
-            </div>
-            {item.related_agent_run_ids.length > 0 ? (
-              <p className="cf-attention__runs">
-                {item.related_agent_run_ids.length} related agent run
-                {item.related_agent_run_ids.length === 1 ? "" : "s"}. Open the
-                request to inspect the rail.
-              </p>
-            ) : null}
-          </Card>
-        ))}
+                <Chip tone="neutral" dot>
+                  Synthetic / mock
+                </Chip>
+              </div>
+
+              <div className="cf-attention__reason">
+                <span className="cf-attention__eyebrow">Needs attention because</span>
+                <div className="cf-preview__row">
+                  {item.reasons.map((reason) => (
+                    <Chip key={reason} tone={reasonTone(reason)} dot>
+                      {humanizeToken(reason)}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+
+              <div className="cf-attention__grid">
+                <span>
+                  <span className="cf-attention__label">Workflow state</span>
+                  {workflowStateLabel(item.workflow_state)}
+                </span>
+                <span>
+                  <span className="cf-attention__label">Responsible owner</span>
+                  {agentLabel}
+                </span>
+                <span className="cf-attention__wide">
+                  <span className="cf-attention__label">Recommended next action</span>
+                  {recommendedAction(item)}
+                </span>
+              </div>
+
+              <div className="cf-attention__footer">
+                <span>
+                  Evidence: open request
+                </span>
+                <span>
+                  Audit: inspect trail
+                </span>
+                {item.related_agent_run_ids.length > 0 ? (
+                  <span>
+                    {item.related_agent_run_ids.length} related agent run
+                    {item.related_agent_run_ids.length === 1 ? "" : "s"}
+                  </span>
+                ) : (
+                  <span>Human-led guardrail</span>
+                )}
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </ConsoleShell>
   );

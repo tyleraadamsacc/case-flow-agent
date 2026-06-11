@@ -8,6 +8,7 @@ from google.adk.events import Event, EventActions
 from google.genai import types
 from pydantic import ConfigDict
 
+from app.adk_agents import session_state
 from app.adk_agents.session_state import LEGAL_REQUEST, run_key
 from app.llm.model_assist import ModelAssist
 from app.models.agent_run import AgentRunDraft
@@ -54,6 +55,14 @@ class CaseFlowAgent(BaseAgent):
         try:
             state = dict(ctx.session.state)
             draft = self.execute(state)
+            instruction = session_state.get_human_instruction(state, self.name)
+            if instruction is not None:
+                draft.input_summary = (
+                    f"{draft.input_summary} Human instruction: {instruction}"
+                    if draft.input_summary
+                    else f"Human instruction: {instruction}"
+                )
+                draft.output["human_instruction"] = instruction
             task = self.llm_task_for(draft)
             if (
                 self.llm_assist is not None

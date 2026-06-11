@@ -40,6 +40,22 @@
       "requires_human_review": true,
       "suggested_resolution": "Route to SME review to confirm the legal process type.",
       "evidence_id": "DEF-AMBIGUOUS-REQUEST-TYPE"
+    },
+    {
+      "code": "unresolved_template_placeholder",
+      "severity": "blocking",
+      "message": "The source request still contains unfilled LERS template placeholder text.",
+      "requires_human_review": true,
+      "suggested_resolution": "Return to the requesting agency for a completed template or correct the field with a human override when independently verified.",
+      "evidence_id": "DEF-UNRESOLVED-TEMPLATE-PLACEHOLDER"
+    },
+    {
+      "code": "scope_authority_mismatch",
+      "severity": "warning",
+      "message": "One or more requested data categories lacks an obvious matching cited authority.",
+      "requires_human_review": true,
+      "suggested_resolution": "Confirm the scope-to-authority matrix before final approval or request narrowing/clarification.",
+      "evidence_id": "DEF-SCOPE-AUTHORITY-MISMATCH"
     }
   ]
 }

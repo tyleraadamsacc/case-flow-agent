@@ -15,7 +15,32 @@ export function metricLabel(metric: GovernanceMetric): string {
   return metric.title;
 }
 
-const VISIBLE_DEFAULT = 6;
+export function dataConfidenceLabel(value: string): string {
+  if (value === "synthetic_mock") {
+    return "Synthetic / mock";
+  }
+  return humanizeToken(value);
+}
+
+function formatMetricValue(metric: GovernanceMetric, unit?: string): string {
+  const rounded =
+    Number.isInteger(metric.value) ? metric.value : metric.value.toFixed(1);
+  if (unit) {
+    return `${rounded} ${unit}`;
+  }
+  switch (metric.unit) {
+    case "percent":
+      return `${rounded}%`;
+    case "days":
+      return `${rounded}d`;
+    case "hours":
+      return `${rounded}h`;
+    default:
+      return String(rounded);
+  }
+}
+
+const VISIBLE_DEFAULT = 5;
 
 /** Horizontal bar list for dimensioned metrics (product volume,
  * processing time, bottleneck dwell) — calm CSS bars, no chart library.
@@ -27,11 +52,13 @@ export default function MetricBarList({
   subtitle,
   metrics,
   unit,
+  emptyMessage = "No signal yet. This view will populate as governed requests move through the workflow.",
 }: {
   title: string;
   subtitle?: string;
   metrics: GovernanceMetric[];
   unit?: string;
+  emptyMessage?: string;
 }) {
   const [showAll, setShowAll] = useState(false);
   const sorted = [...metrics].sort((a, b) => b.value - a.value);
@@ -41,29 +68,33 @@ export default function MetricBarList({
   const confidence = metrics[0]?.data_confidence;
 
   return (
-    <Card title={title} subtitle={subtitle}>
+    <Card className="cf-governance-chart-card" title={title} subtitle={subtitle}>
       {metrics.length === 0 ? (
-        <p style={{ margin: 0, color: "var(--text-secondary)" }}>
-          No data yet. Process a request to populate this view.
-        </p>
+        <div className="cf-governance-empty">
+          <span className="cf-governance-empty__mark" aria-hidden="true" />
+          <p>{emptyMessage}</p>
+        </div>
       ) : (
         <ul className="cf-barlist">
-          {visible.map((metric) => (
+          {visible.map((metric, index) => (
             <li key={metric.metric_id} className="cf-barlist__item">
-              <span className="cf-barlist__label" title={metric.title}>
-                {metricLabel(metric)}
+              <span className="cf-barlist__rank" aria-label={`Rank ${index + 1}`}>
+                {index + 1}
               </span>
-              <span className="cf-barlist__track">
+              <span className="cf-barlist__main">
+                <span className="cf-barlist__label" title={metric.title}>
+                  {metricLabel(metric)}
+                </span>
+                <span className="cf-barlist__hint">{humanizeMetricTitle(metric.title)}</span>
+              </span>
+              <span className="cf-barlist__track" aria-hidden="true">
                 <span
                   className="cf-barlist__fill"
                   style={{ width: `${Math.max((metric.value / max) * 100, 2)}%` }}
                 />
               </span>
               <span className="cf-barlist__value">
-                {Number.isInteger(metric.value)
-                  ? metric.value
-                  : metric.value.toFixed(1)}
-                {unit ? ` ${unit}` : ""}
+                {formatMetricValue(metric, unit)}
               </span>
             </li>
           ))}
@@ -82,12 +113,24 @@ export default function MetricBarList({
         </button>
       ) : null}
       {confidence ? (
-        <div style={{ marginTop: "var(--space-3)" }}>
+        <div className="cf-governance-chart-card__footer">
           <Chip tone="violet" title="Data confidence">
-            {confidence}
+            {dataConfidenceLabel(confidence)}
           </Chip>
+          {metrics.length > VISIBLE_DEFAULT ? (
+            <span className="cf-fields__muted">
+              Top {VISIBLE_DEFAULT} shown first
+            </span>
+          ) : null}
         </div>
       ) : null}
     </Card>
+  );
+}
+
+function humanizeMetricTitle(value: string): string {
+  return value.replace(
+    /([A-Za-z]+(?:_[A-Za-z]+)+)/g,
+    (token) => humanizeToken(token),
   );
 }

@@ -19,7 +19,8 @@ def extracted(legal_request_id: str) -> LegalRequest:
 
 
 def test_scenario_c_flags_pen_register_trap_and_trace_and_non_disclosure():
-    check = make_service().check(extracted("LER-2026-004835"))
+    request = extracted("LER-2026-004835")
+    check = make_service().check(request)
     assert {
         "sealed",
         "non_disclosure_to_subscriber",
@@ -33,9 +34,14 @@ def test_scenario_c_flags_pen_register_trap_and_trace_and_non_disclosure():
         ReviewReason.TRAP_AND_TRACE_REQUESTED,
         ReviewReason.NON_DISCLOSURE_REQUESTED,
         ReviewReason.NO_ADVERSE_ACTION_REQUESTED,
+        ReviewReason.ONGOING_COLLECTION_REQUESTED,
         ReviewReason.SEALED_ORDER_REQUESTED,
     } <= set(check.review_reasons)
     assert "SH-PEN-REGISTER" in check.evidence_ids
+    assert "SH-ONGOING-ACCESS" in check.evidence_ids
+    assert check.active_flags.count("ongoing_access_requested") == 1
+    assert request.special_handling.ongoing_duration_days == 60
+    assert request.special_handling.ongoing_update_interval_minutes == 15
 
 
 def test_scenario_e_has_no_special_handling():

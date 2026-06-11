@@ -1,7 +1,15 @@
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
-import type { LegalRequest } from "../../api/types";
+import type { LegalRequest, SourceDocumentSection } from "../../api/types";
 import Card from "../ui/Card";
+import Chip from "../ui/Chip";
+
+export interface SourceTraceTarget {
+  section_id: string;
+  source_span?: string | null;
+  label?: string;
+}
 
 interface Range {
   start: number;
@@ -52,16 +60,62 @@ function highlight(text: string, spans: string[]): ReactNode[] {
   return parts;
 }
 
+function lineLabel(section: SourceDocumentSection): string {
+  if (section.start_line === section.end_line) {
+    return `Line ${section.start_line}`;
+  }
+  return `Lines ${section.start_line}-${section.end_line}`;
+}
+
 export default function SourceDocumentPanel({
   request,
+  activeTraceTarget,
 }: {
   request: LegalRequest;
+  activeTraceTarget?: SourceTraceTarget | null;
 }) {
   const text = request.raw_source_text;
+  const sourceSections = request.source_sections ?? [];
+  const firstSectionId = sourceSections[0]?.section_id ?? null;
+  const [activeSectionId, setActiveSectionId] = useState<string | null>(
+    firstSectionId,
+  );
+  const docRef = useRef<HTMLDivElement>(null);
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const spans = [
-    ...request.subject_identifiers.map((id) => id.source_span),
-    ...request.legal_authorities.map((authority) => authority.source_span),
+    ...(request.subject_identifiers ?? []).map((id) => id.source_span),
+    ...(request.legal_authorities ?? []).map((authority) => authority.source_span),
+    activeTraceTarget?.source_span,
   ].filter((span): span is string => Boolean(span));
+  const highlightedSpanCount = new Set(spans).size;
+
+  useEffect(() => {
+    setActiveSectionId(firstSectionId);
+  }, [firstSectionId, request.legal_request_id]);
+
+  function jumpToSection(sectionId: string) {
+    setActiveSectionId(sectionId);
+    const container = docRef.current;
+    const section = sectionRefs.current[sectionId];
+    if (!container || !section) {
+      return;
+    }
+    const containerTop = container.getBoundingClientRect().top;
+    const sectionTop = section.getBoundingClientRect().top;
+    const top = container.scrollTop + sectionTop - containerTop - 8;
+    if (typeof container.scrollTo === "function") {
+      container.scrollTo({ top, behavior: "smooth" });
+    } else {
+      container.scrollTop = top;
+    }
+  }
+
+  useEffect(() => {
+    if (!activeTraceTarget?.section_id) {
+      return;
+    }
+    jumpToSection(activeTraceTarget.section_id);
+  }, [activeTraceTarget?.section_id, activeTraceTarget?.source_span]);
 
   return (
     <Card
@@ -70,7 +124,77 @@ export default function SourceDocumentPanel({
         request.raw_source_uri ?? "Synthetic LERS request (mock data only)"
       }
     >
-      {text ? (
+      {sourceSections.length > 0 ? (
+        <>
+          <div className="cf-source-toolbar" aria-label="Source document summary">
+            <Chip tone="violet">Synthetic / mock data</Chip>
+            <Chip tone="neutral">
+              {sourceSections.length} section
+              {sourceSections.length === 1 ? "" : "s"}
+            </Chip>
+            <Chip tone={highlightedSpanCount ? "blue" : "neutral"} dot={highlightedSpanCount > 0}>
+              {highlightedSpanCount} highlighted source span
+              {highlightedSpanCount === 1 ? "" : "s"}
+            </Chip>
+          </div>
+          <div
+            className="cf-source-nav"
+            aria-label="Source document section navigator"
+          >
+            {sourceSections.map((section) => {
+              const active = section.section_id === activeSectionId;
+              return (
+                <Chip
+                  key={section.section_id}
+                  tone={active ? "blue" : "neutral"}
+                  onClick={() => jumpToSection(section.section_id)}
+                  title={lineLabel(section)}
+                >
+                  {section.title}
+                </Chip>
+              );
+            })}
+          </div>
+          <div
+            className="cf-doc"
+            ref={docRef}
+            role="document"
+            aria-label="Source request document sections"
+            tabIndex={0}
+            style={{ position: "relative" }}
+          >
+            {sourceSections.map((section) => {
+              const active = section.section_id === activeSectionId;
+              return (
+                <section
+                  key={section.section_id}
+                  ref={(node) => {
+                    sectionRefs.current[section.section_id] = node;
+                  }}
+                  aria-current={active ? "true" : undefined}
+                  className={
+                    active
+                      ? "cf-doc__section cf-doc__section--active"
+                      : "cf-doc__section"
+                  }
+                >
+                  <header
+                    className="cf-doc__section-header"
+                  >
+                    <h4 className="cf-fields__label">{section.title}</h4>
+                    <span className="cf-fields__muted">{lineLabel(section)}</span>
+                  </header>
+                  <p style={{ margin: 0 }}>
+                    {section.text
+                      ? highlight(section.text, spans)
+                      : "No section text available."}
+                  </p>
+                </section>
+              );
+            })}
+          </div>
+        </>
+      ) : text ? (
         <p className="cf-doc">{highlight(text, spans)}</p>
       ) : (
         <p style={{ margin: 0, color: "var(--text-muted)" }}>

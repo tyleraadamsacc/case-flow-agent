@@ -1,0 +1,75 @@
+{
+  "legal_request_id": "LER-2026-004956",
+  "scenario": "N",
+  "source_type": "lers_request_template",
+  "date_received": "2026-06-10",
+  "raw_source_uri": "local://legal_requests/scenario_n_package_validation_defects.json",
+  "raw_source_text": "LEGAL PROCESS REQUEST - To: Google LLC, Google Legal Investigations Support (LERS). Request for basic subscriber information and account creation records for account user.synthetic.n@example.com for the period 2026-05-01 through 2026-05-31 pursuant to 18 U.S.C. §2703(c)(2). SYNTHETIC DATA - NOT A REAL LEGAL DOCUMENT.",
+  "extracted_fields": {
+    "legal_process": {
+      "type": "legal_process_request",
+      "court_order_included": false,
+      "ex_parte_order": false,
+      "pen_register": false,
+      "trap_and_trace": false,
+      "location_tracking": false,
+      "stored_communications": false
+    },
+    "requesting_agency": {
+      "agency": "City of Mesa Police Department (Synthetic)",
+      "case_number": "MC-26-80656",
+      "officer": "Officer Priya Shah",
+      "contact_email": "synthetic.records.shah@example.gov",
+      "phone": "555-0116"
+    },
+    "subject_identifiers": [
+      {
+        "type": "gmail_account",
+        "value": "user.synthetic.n@example.com",
+        "confidence": 0.99,
+        "source_span": "account user.synthetic.n@example.com"
+      }
+    ],
+    "requested_data_categories": [
+      {
+        "category": "Subscriber Information",
+        "product_domain": "Account / Subscriber",
+        "sensitivity": "medium",
+        "content_type": "subscriber",
+        "requires_sme_review": false
+      },
+      {
+        "category": "Account Creation and Login Records",
+        "product_domain": "Account / Subscriber",
+        "sensitivity": "medium",
+        "content_type": "subscriber",
+        "requires_sme_review": false
+      }
+    ],
+    "product_domains": ["Account / Subscriber"],
+    "requested_period": {
+      "start": "2026-05-01T00:00:00Z",
+      "end": "2026-05-31T23:59:59Z"
+    },
+    "special_handling": {
+      "sealed": false,
+      "non_disclosure_to_subscriber": false,
+      "no_adverse_action": false,
+      "pen_register_requested": false,
+      "trap_and_trace_requested": false,
+      "ongoing_access_requested": false,
+      "location_tracking_requested": false,
+      "content_requested": false,
+      "tombstone_requested": false,
+      "production_deadline_days": 35,
+      "service_deadline_days": 14
+    },
+    "legal_authorities": [
+      {
+        "citation": "18 U.S.C. §2703(c)(2)",
+        "description": "Basic subscriber information disclosure",
+        "source_span": "pursuant to 18 U.S.C. §2703(c)(2)"
+      }
+    ]
+  }
+}

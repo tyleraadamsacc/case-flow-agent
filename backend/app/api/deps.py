@@ -7,12 +7,13 @@ from fastapi import Request
 
 from app.config import Settings
 from app.mock_data.seed import fixtures_dir, seed_legal_requests
-from app.models.enums import ActorType
+from app.models.enums import ActorType, Role
 from app.llm.model_assist import ModelAssist
 from app.llm.model_router import ModelRouter
 from app.llm.prompt_loader import PromptLoader
 from app.orchestration.agent_execution_service import AgentExecutionService
 from app.orchestration.approval_policy import ApprovalPolicy
+from app.orchestration.override_service import OverrideService
 from app.orchestration.workflow_state_machine import WorkflowStateMachine
 from app.repositories.local_agent_run_repository import LocalAgentRunRepository
 from app.repositories.local_audit_repository import LocalAuditRepository
@@ -22,18 +23,25 @@ from app.repositories.local_storage_repository import LocalStorageRepository
 from app.services.audit_service import AuditService
 from app.services.deficiency_service import DeficiencyService
 from app.services.governance_metrics_service import GovernanceMetricsService
+from app.services.response_package_service import ResponsePackageService
 from app.services.request_extraction_service import RequestExtractionService
 from app.services.sensitive_special_handling_service import SensitiveSpecialHandlingService
+from app.services.scope_authority_service import ScopeAuthorityService
 from app.services.sop_retrieval_service import LocalSopRetrievalService
 
 
 @dataclass(frozen=True)
 class CurrentActor:
-    """Local mock user. IAP / Workspace identity arrives in a later PR."""
+    """Local mock user. IAP / Workspace identity arrives in a later PR.
+
+    Identity is taken from request headers so the demo can switch between
+    reviewers (and roles) to exercise dual-control approval. This is
+    synthetic convenience, not an authentication boundary.
+    """
 
     actor_id: str = "analyst.local"
     actor_type: ActorType = ActorType.HUMAN
-    role: str = "analyst"
+    role: Role = Role.ANALYST
 
 
 class Container:
@@ -82,6 +90,11 @@ class Container:
             mock_dir / "sop" / "special_handling_rules.json"
         )
         self.deficiency_service = DeficiencyService(mock_dir / "sop" / "deficiency_rules.json")
+        self.scope_authority_service = ScopeAuthorityService()
+        self.response_package_service = ResponsePackageService(
+            mock_dir / "sop" / "response_package_rules.json"
+        )
+        self.override_service = OverrideService(self.deficiency_service)
         if settings.app_mode == "gcp" and settings.agent_search_datastore:
             from app.services.agent_search_retrieval_service import (
                 AgentSearchRetrievalService,
@@ -128,5 +141,17 @@ def get_container(request: Request) -> Container:
     return request.app.state.container
 
 
-def get_current_actor() -> CurrentActor:
-    return CurrentActor()
+def get_current_actor(request: Request) -> CurrentActor:
+    """Resolve the acting reviewer from request headers.
+
+    X-CaseFlow-Actor sets the actor id, X-CaseFlow-Role the role. Both
+    default to the local analyst so existing clients and tests are
+    unaffected; an unknown role falls back to analyst rather than failing.
+    """
+    actor_id = request.headers.get("X-CaseFlow-Actor", "").strip() or "analyst.local"
+    role_raw = request.headers.get("X-CaseFlow-Role", "").strip().lower()
+    try:
+        role = Role(role_raw) if role_raw else Role.ANALYST
+    except ValueError:
+        role = Role.ANALYST
+    return CurrentActor(actor_id=actor_id, role=role)

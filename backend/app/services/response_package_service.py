@@ -11,7 +11,7 @@ verbatim from the ETL output, never invented.
 import json
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from app.adk_agents.registry import (
     ETL_AGENT,
@@ -27,6 +27,7 @@ from app.models.deficiency_finding import DeficiencyFinding
 from app.models.enums import DraftType
 from app.models.etl_output import EtlOutput
 from app.models.legal_request import LegalRequest
+from app.models.lers_quality import PackageValidationFinding
 from app.models.production_package import (
     DataFieldDefinition,
     ProductionPackage,
@@ -71,7 +72,7 @@ class ResponsePackageService:
             else self._rules["ordinary_course_statement"]
         )
         field_kind = "gps" if self._is_location_request(request) else "subscriber"
-        return ProductionPackage(
+        package = ProductionPackage(
             request_id=request.legal_request_id,
             # Format per Template LERS Response: PROD-2026-004812-01.
             production_id=f"PROD-{request.legal_request_id.removeprefix('LER-')}-01",
@@ -111,6 +112,102 @@ class ResponsePackageService:
             risk_flags=risk_flags or [],
             section_provenance=dict(SECTION_PROVENANCE),
         )
+        package.validation_findings = self.validate_package(package)
+        return package
+
+    def validate_package(
+        self, package: ProductionPackage
+    ) -> list[PackageValidationFinding]:
+        findings: list[PackageValidationFinding] = []
+        self._require(
+            findings,
+            bool(package.production_id),
+            code="missing_production_id",
+            section="header",
+            message="Production package is missing a production ID.",
+        )
+        self._require(
+            findings,
+            bool(package.request_id),
+            code="missing_request_id",
+            section="header",
+            message="Production package is missing the source legal request ID.",
+        )
+        self._require(
+            findings,
+            package.date_produced is not None,
+            code="missing_date_produced",
+            section="header",
+            message="Production package is missing the production date.",
+        )
+        self._require(
+            findings,
+            package.requesting_agency is not None,
+            code="missing_requesting_agency",
+            section="requesting_agency",
+            message="Production package is missing requesting agency details.",
+        )
+        self._require(
+            findings,
+            bool(package.subject_identifiers),
+            code="missing_subject_identifiers",
+            section="subject_identifiers",
+            message="Production package is missing subject identifiers.",
+        )
+
+        record_count = len(package.records)
+        summary_count = package.production_summary.total_responsive_records
+        self._require(
+            findings,
+            summary_count == record_count,
+            code="record_count_mismatch",
+            section="record_index",
+            message=(
+                "Production summary count does not match the responsive record index "
+                f"({summary_count} summary vs. {record_count} indexed)."
+            ),
+        )
+        if record_count:
+            self._require(
+                findings,
+                package.production_summary.start_date is not None
+                and package.production_summary.end_date is not None,
+                code="missing_production_period",
+                section="production_summary",
+                message="Responsive-record package is missing the produced date range.",
+            )
+            self._require(
+                findings,
+                bool(package.field_definitions),
+                code="missing_field_definitions",
+                section="field_definitions",
+                message="Responsive-record package is missing field definitions.",
+                severity="warning",
+            )
+
+        custody = package.chain_of_custody
+        self._require(
+            findings,
+            custody.collection_date is not None
+            and bool(custody.collection_method)
+            and bool(custody.collected_by)
+            and bool(custody.review_status),
+            code="chain_of_custody_incomplete",
+            section="chain_of_custody",
+            message="Chain-of-custody section is incomplete.",
+        )
+
+        certification = package.certification
+        self._require(
+            findings,
+            bool(certification.authorized_representative)
+            and bool(certification.title)
+            and bool(certification.certification_text),
+            code="certification_incomplete",
+            section="certification",
+            message="Certification section is missing a representative, title, or text.",
+        )
+        return findings
 
     def package_sections(self, package: ProductionPackage) -> dict[str, str]:
         """Flatten the package into the TextDraft section map."""
@@ -197,3 +294,23 @@ class ResponsePackageService:
             category.content_type == "location"
             for category in request.requested_data_categories
         ) or "Maps / Location" in request.product_domains
+
+    @staticmethod
+    def _require(
+        findings: list[PackageValidationFinding],
+        condition: bool,
+        *,
+        code: str,
+        section: str,
+        message: str,
+        severity: Literal["blocking", "warning"] = "blocking",
+    ) -> None:
+        if not condition:
+            findings.append(
+                PackageValidationFinding(
+                    code=code,
+                    severity=severity,
+                    section=section,
+                    message=message,
+                )
+            )

@@ -79,6 +79,11 @@ def get_production_package(
     request = container.legal_request_repository.get(legal_request_id)
     if request.production_package is None:
         raise NotFoundError("production_package", legal_request_id)
+    findings = container.response_package_service.validate_package(
+        request.production_package
+    )
+    request.production_package.validation_findings = findings
+    request.package_validation_findings = findings
     return request.production_package
 
 

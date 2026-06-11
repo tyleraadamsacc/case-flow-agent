@@ -1,0 +1,74 @@
+{
+  "legal_request_id": "LER-2026-004901",
+  "scenario": "I",
+  "source_type": "lers_request_template",
+  "date_received": "2026-06-09",
+  "raw_source_uri": "local://legal_requests/scenario_i_unresolved_template_placeholders.json",
+  "raw_source_text": "SEARCH WARRANT - [INSTRUCTIONS - PLEASE DELETE] To: Google LLC, Google Legal Investigations Support (LERS). The affiant, YOUR NAME HERE, Multnomah County Sheriff's Office (SYNTHETIC), requests subscriber information for account ACCOUNT NAME [IF KNOWN] and Google ID UID-449120 for the period DATE OF INTEREST through DATE OF INTEREST regarding LIST CRIMINAL OFFENSE(S), pursuant to 18 U.S.C. §2703(c)(2). SYNTHETIC DATA - NOT A REAL LEGAL DOCUMENT.",
+  "extracted_fields": {
+    "legal_process": {
+      "type": "search_warrant",
+      "court_order_included": true,
+      "ex_parte_order": false,
+      "pen_register": false,
+      "trap_and_trace": false,
+      "location_tracking": false,
+      "stored_communications": false
+    },
+    "requesting_agency": {
+      "agency": "Multnomah County Sheriff's Office (Synthetic)",
+      "case_number": "MC-26-80601",
+      "officer": "YOUR NAME HERE",
+      "contact_email": "synthetic.placeholder@example.gov",
+      "phone": "555-0111"
+    },
+    "subject_identifiers": [
+      {
+        "type": "gmail_account",
+        "value": "ACCOUNT NAME [IF KNOWN]",
+        "confidence": 0.2,
+        "source_span": "account ACCOUNT NAME [IF KNOWN]"
+      },
+      {
+        "type": "google_id",
+        "value": "UID-449120",
+        "confidence": 0.92,
+        "source_span": "Google ID UID-449120"
+      }
+    ],
+    "requested_data_categories": [
+      {
+        "category": "Subscriber Information",
+        "product_domain": "Account / Subscriber",
+        "sensitivity": "medium",
+        "content_type": "subscriber",
+        "requires_sme_review": false
+      }
+    ],
+    "product_domains": ["Account / Subscriber"],
+    "requested_period": {
+      "start": null,
+      "end": null
+    },
+    "special_handling": {
+      "sealed": false,
+      "non_disclosure_to_subscriber": false,
+      "no_adverse_action": false,
+      "pen_register_requested": false,
+      "trap_and_trace_requested": false,
+      "ongoing_access_requested": false,
+      "location_tracking_requested": false,
+      "content_requested": false,
+      "tombstone_requested": false,
+      "production_deadline_days": 35,
+      "service_deadline_days": 14
+    },
+    "legal_authorities": [
+      {
+        "citation": "18 U.S.C. §2703(c)(2)",
+        "description": "Basic subscriber information disclosure",
+        "source_span": "pursuant to 18 U.S.C. §2703(c)(2)"
+      }
+    ]
+  }
+}

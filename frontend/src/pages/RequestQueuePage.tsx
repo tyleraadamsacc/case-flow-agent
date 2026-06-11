@@ -10,11 +10,15 @@ import Chip from "../components/ui/Chip";
 import StatusBadge from "../components/ui/StatusBadge";
 import {
   agencyName,
+  auditStatusLabel,
   blockingDeficiencyCount,
   formatDate,
+  humanizeToken,
   legalProcessLabel,
   nextAction,
+  reviewRequirementLabel,
   specialHandlingBadges,
+  workflowStateLabel,
 } from "../lib/requestDisplay";
 
 type QueueFilter = "all" | "intake" | "agents" | "review" | "finalized" | "blocked";
@@ -70,8 +74,59 @@ const PULSE_TILES: Array<{ id: QueueFilter; label: string }> = [
   { id: "agents", label: "Agent workflow" },
   { id: "review", label: "Human decision" },
   { id: "blocked", label: "Blocked" },
-  { id: "finalized", label: "Finalized" },
+  { id: "finalized", label: "Review recorded" },
 ];
+
+function auditStatusFor(
+  request: LegalRequest,
+  runs: Record<string, AgentRun>,
+): string {
+  return auditStatusLabel({ ...request, agent_runs: runs });
+}
+
+function reviewRequirementFor(
+  request: LegalRequest,
+  runs: Record<string, AgentRun>,
+): string {
+  if (blockingDeficiencyCount(request) > 0) {
+    return reviewRequirementLabel(request);
+  }
+  if (Object.values(runs).some((run) => run.requires_human_review)) {
+    return "Agent output review required";
+  }
+  return reviewRequirementLabel(request);
+}
+
+function agentProgressLabel(runs: Record<string, AgentRun>): string {
+  const values = Object.values(runs);
+  const complete = values.filter((run) => run.status === "complete").length;
+  const review = values.filter((run) => run.requires_human_review).length;
+  if (values.length === 0) {
+    return "Six-agent workflow not started";
+  }
+  if (review > 0) {
+    return `${review} agent output${review === 1 ? "" : "s"} need review`;
+  }
+  return `${complete} of 6 agents complete`;
+}
+
+function requestRiskLabels(request: LegalRequest): string[] {
+  const labels = new Set<string>();
+  for (const finding of request.deficiency_findings) {
+    if (finding.severity === "blocking") {
+      labels.add("Blocking deficiency");
+    } else {
+      labels.add("Warning deficiency");
+    }
+  }
+  for (const finding of request.package_validation_findings) {
+    labels.add(humanizeToken(finding.severity));
+  }
+  if (request.routing_recommendation?.sla_risk) {
+    labels.add("SLA risk");
+  }
+  return Array.from(labels);
+}
 
 /** Analyst worklist (plan §13): every seeded synthetic request with its
  * state, special-handling badges, six-agent status, deficiency status,
@@ -184,19 +239,36 @@ export default function RequestQueuePage() {
       </div>
 
       {requests ? (
-        <div className="cf-pulse-strip">
-          {PULSE_TILES.map((tile) => (
-            <button
-              key={tile.id}
-              type="button"
-              className="cf-pulse"
-              aria-pressed={group === tile.id}
-              onClick={() => setGroup(tile.id)}
-            >
-              <span className="cf-pulse__value">{counts[tile.id]}</span>
-              <span className="cf-pulse__label">{tile.label}</span>
-            </button>
-          ))}
+        <div className="cf-queue-overview">
+          <div className="cf-pulse-strip">
+            {PULSE_TILES.map((tile) => (
+              <button
+                key={tile.id}
+                type="button"
+                className="cf-pulse"
+                aria-pressed={group === tile.id}
+                onClick={() => setGroup(tile.id)}
+              >
+                <span className="cf-pulse__value">{counts[tile.id]}</span>
+                <span className="cf-pulse__label">{tile.label}</span>
+              </button>
+            ))}
+          </div>
+          <Card variant="soft" className="cf-queue-demo">
+            <span className="cf-queue-demo__eyebrow">Demo walkthrough</span>
+            <h2>From intake to human decision</h2>
+            <p>
+              Open a request to inspect the extracted legal process, six-agent
+              outputs, draft package, and audit trail. Agents prepare evidence;
+              analysts decide what moves forward.
+            </p>
+            <div className="cf-queue-demo__steps" aria-label="Workflow walkthrough">
+              <span>Intake</span>
+              <span>Agent checks</span>
+              <span>Human review</span>
+              <span>Audit-ready</span>
+            </div>
+          </Card>
         </div>
       ) : null}
 
@@ -251,6 +323,9 @@ export default function RequestQueuePage() {
         {filtered?.map((request) => {
           const badges = specialHandlingBadges(request.special_handling);
           const blocking = blockingDeficiencyCount(request);
+          const runs =
+            runsByRequest[request.legal_request_id] ?? request.agent_runs;
+          const riskLabels = requestRiskLabels(request);
           return (
             <button
               key={request.legal_request_id}
@@ -258,50 +333,84 @@ export default function RequestQueuePage() {
               className="cf-queue__row"
               onClick={() => navigate(`/requests/${request.legal_request_id}`)}
             >
-              <span className="cf-queue__id">{request.legal_request_id}</span>
-              <span className="cf-queue__main">
-                <span className="cf-queue__agency">{agencyName(request)}</span>
-                <span className="cf-queue__meta">
-                  {legalProcessLabel(request)} · received{" "}
-                  {formatDate(request.date_received)}
+              <span className="cf-queue__topline">
+                <span className="cf-queue__id">{request.legal_request_id}</span>
+                <StatusBadge status={request.workflow_state} />
+                <Chip tone="neutral" dot>
+                  Synthetic / mock
+                </Chip>
+              </span>
+
+              <span className="cf-queue__body">
+                <span className="cf-queue__main">
+                  <span className="cf-queue__agency">{agencyName(request)}</span>
+                  <span className="cf-queue__meta">
+                    {legalProcessLabel(request)} · received{" "}
+                    {formatDate(request.date_received)}
+                  </span>
+                </span>
+
+                <span className="cf-queue__chips">
+                  {request.urgency_tier ? (
+                    <Chip tone={urgencyTone(request.urgency_tier)} dot>
+                      {humanizeToken(request.urgency_tier)}
+                    </Chip>
+                  ) : null}
+                  {request.product_domains.slice(0, 3).map((domain) => (
+                    <Chip key={domain} tone="cyan">
+                      {domain}
+                    </Chip>
+                  ))}
+                  {badges.slice(0, 3).map((badge) => (
+                    <Chip key={badge} tone="violet" dot>
+                      {badge}
+                    </Chip>
+                  ))}
+                  {badges.length > 3 ? (
+                    <Chip tone="violet">+{badges.length - 3}</Chip>
+                  ) : null}
+                  {riskLabels.map((label) => (
+                    <Chip
+                      key={label}
+                      tone={label.includes("Blocking") ? "red" : "amber"}
+                      dot
+                    >
+                      {label}
+                    </Chip>
+                  ))}
+                  {blocking > 0 ? (
+                    <span className="cf-sr-only">
+                      {blocking} blocking deficienc
+                      {blocking === 1 ? "y" : "ies"}
+                    </span>
+                  ) : null}
                 </span>
               </span>
-              <span className="cf-queue__chips">
-                {request.urgency_tier ? (
-                  <Chip tone={urgencyTone(request.urgency_tier)} dot>
-                    {request.urgency_tier}
-                  </Chip>
-                ) : null}
-                {request.product_domains.slice(0, 2).map((domain) => (
-                  <Chip key={domain} tone="cyan">
-                    {domain}
-                  </Chip>
-                ))}
-                {badges.slice(0, 2).map((badge) => (
-                  <Chip key={badge} tone="violet" dot>
-                    {badge}
-                  </Chip>
-                ))}
-                {badges.length > 2 ? (
-                  <Chip tone="violet">+{badges.length - 2}</Chip>
-                ) : null}
-                {blocking > 0 ? (
-                  <Chip tone="red" dot>
-                    {blocking} blocking deficienc{blocking === 1 ? "y" : "ies"}
-                  </Chip>
-                ) : null}
-              </span>
-              <span className="cf-queue__minirail">
-                <MiniRail
-                  runs={
-                    runsByRequest[request.legal_request_id] ??
-                    request.agent_runs
-                  }
-                />
-              </span>
-              <StatusBadge status={request.workflow_state} />
-              <span className="cf-queue__next">
-                {nextAction(request.workflow_state)}
+
+              <span className="cf-queue__workflow">
+                <span className="cf-queue__metric">
+                  <span className="cf-queue__label">Workflow state</span>
+                  <span>{workflowStateLabel(request.workflow_state)}</span>
+                </span>
+                <span className="cf-queue__metric">
+                  <span className="cf-queue__label">Six-agent preview</span>
+                  <span className="cf-queue__railcopy">
+                    <MiniRail runs={runs} />
+                    {agentProgressLabel(runs)}
+                  </span>
+                </span>
+                <span className="cf-queue__metric">
+                  <span className="cf-queue__label">Next human action</span>
+                  <span>{nextAction(request.workflow_state)}</span>
+                </span>
+                <span className="cf-queue__metric">
+                  <span className="cf-queue__label">Review requirement</span>
+                  <span>{reviewRequirementFor(request, runs)}</span>
+                </span>
+                <span className="cf-queue__metric">
+                  <span className="cf-queue__label">Audit status</span>
+                  <span>{auditStatusFor(request, runs)}</span>
+                </span>
               </span>
             </button>
           );

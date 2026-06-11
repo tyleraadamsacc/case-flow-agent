@@ -4,12 +4,16 @@
 
 :root {
   /* Surfaces — soft neutral canvas, never pure-white everywhere, never dark. */
-  --background-app: #f7f9fc;
+  --background-app: #f8fafd;
   --surface-card: #ffffff;
-  --surface-soft: #f1f4f9;
-  --surface-tint-blue: #eef4ff;
-  --surface-track: #d8deea;
-  --border-subtle: #e0e5ef;
+  --surface-soft: #f3f6fb;
+  --surface-raised: #fbfcff;
+  --surface-tint-blue: #eef5ff;
+  --surface-tint-violet: #f4efff;
+  --surface-tint-cyan: #e9f8fb;
+  --surface-track: #d9e0eb;
+  --border-subtle: #dde5f0;
+  --border-strong: #c4cfdd;
 
   /* Text */
   --text-primary: #202124;
@@ -19,10 +23,13 @@
 
   /* Primary palette — color carries meaning, not decoration. */
   --blue: #1a73e8;
+  --blue-strong: #185abc;
   --blue-soft: #e8f0fe;
   --violet: #7c4dff;
+  --violet-strong: #5b2bd9;
   --violet-soft: #f0eafe;
   --cyan: #00acc1;
+  --cyan-strong: #007d8c;
   --cyan-soft: #e6f7fa;
   --green: #188038;
   --green-soft: #e6f4ea;
@@ -56,9 +63,10 @@
   --radius-card: 20px;
 
   /* Elevation — subtle, never heavy. */
-  --shadow-card: 0 1px 2px rgba(60, 64, 67, 0.08), 0 8px 24px rgba(60, 64, 67, 0.06);
-  --shadow-card-hover: 0 2px 4px rgba(60, 64, 67, 0.1), 0 12px 32px rgba(60, 64, 67, 0.1);
-  --shadow-bar: 0 1px 2px rgba(60, 64, 67, 0.06);
+  --shadow-card: 0 1px 2px rgba(60, 64, 67, 0.08), 0 10px 28px rgba(60, 64, 67, 0.06);
+  --shadow-card-hover: 0 2px 5px rgba(60, 64, 67, 0.1), 0 16px 36px rgba(60, 64, 67, 0.1);
+  --shadow-bar: 0 1px 2px rgba(60, 64, 67, 0.06), 0 8px 22px rgba(60, 64, 67, 0.04);
+  --shadow-popover: 0 8px 24px rgba(32, 33, 36, 0.14), 0 2px 6px rgba(32, 33, 36, 0.1);
 
   /* Typography — Google-like fallback stack; no proprietary font files. */
   --font-family: "Google Sans", "Inter", "Roboto", Arial, sans-serif;

@@ -48,3 +48,17 @@ class FinalizationBlockedError(CaseFlowError):
         super().__init__(
             f"Finalization blocked for {legal_request_id}: {', '.join(reasons) or 'unspecified'}"
         )
+
+
+class AuthorizationError(CaseFlowError):
+    """Raised when an actor's role may not perform a human action (e.g. a
+    non-senior analyst attempting to co-sign a high-sensitivity request).
+    Synthetic role gating only; not a real authentication boundary."""
+
+    def __init__(self, action: str, role: str, allowed: list[str]):
+        self.action = action
+        self.role = role
+        self.allowed = allowed
+        super().__init__(
+            f"Role '{role}' may not {action}. Allowed roles: {', '.join(allowed)}."
+        )

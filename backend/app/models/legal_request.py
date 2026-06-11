@@ -1,13 +1,21 @@
 from datetime import date
 
 from app.models.agent_run import AgentRun
+from app.models.agent_run_review import AgentRunReview
 from app.models.approval_decision import ApprovalDecision
+from app.models.attestation import Attestation
 from app.models.base import CaseFlowModel
 from app.models.classification_result import ClassificationResult
 from app.models.deficiency_finding import DeficiencyFinding
+from app.models.human_override import HumanOverride
 from app.models.human_review import HumanReview
 from app.models.legal_authority import LegalAuthority
 from app.models.legal_process import LegalProcess
+from app.models.lers_quality import (
+    PackageValidationFinding,
+    ScopeAuthorityCheck,
+    SourceDocumentSection,
+)
 from app.models.note_draft import NoteDraft
 from app.models.production_package import ProductionPackage
 from app.models.requested_data_category import RequestedDataCategory
@@ -42,9 +50,16 @@ class LegalRequest(CaseFlowModel):
     requested_period: RequestedPeriod | None = None
     special_handling: SpecialHandlingFlags = SpecialHandlingFlags()
     legal_authorities: list[LegalAuthority] = []
+    source_sections: list[SourceDocumentSection] = []
+    scope_authority_checks: list[ScopeAuthorityCheck] = []
+    package_validation_findings: list[PackageValidationFinding] = []
     deficiency_findings: list[DeficiencyFinding] = []
     reviews: list[HumanReview] = []
     approvals: list[ApprovalDecision] = []
+    # Human-in-the-lead records (drafts/corrections by people, all audited).
+    human_overrides: list[HumanOverride] = []
+    agent_run_reviews: list[AgentRunReview] = []
+    attestations: list[Attestation] = []
     agent_runs: dict[str, AgentRun] = {}
     # Drafted artifacts persisted by the execution bridge / drafting
     # endpoints. All are drafts pending human review by construction.

@@ -15,11 +15,11 @@ def test_seed_is_idempotent():
     repo = LocalLegalRequestRepository()
     audit_repo = LocalAuditRepository()
     service = AuditService(audit_repo)
-    assert seed_legal_requests(repo, service) == 8
+    assert seed_legal_requests(repo, service) == 14
     assert seed_legal_requests(repo, service) == 0
-    assert len(repo.list_all()) == 8
+    assert len(repo.list_all()) == 14
     ingested = [e for e in audit_repo.list_all() if e.action == AuditAction.REQUEST_INGESTED]
-    assert len(ingested) == 8
+    assert len(ingested) == 14
     assert all(r.workflow_state == WorkflowState.REQUEST_RECEIVED for r in repo.list_all())
 
 

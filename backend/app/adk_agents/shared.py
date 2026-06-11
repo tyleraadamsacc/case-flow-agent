@@ -13,6 +13,7 @@ SME_REVIEW_REASONS: frozenset[str] = frozenset(
         ReviewReason.NON_DISCLOSURE_REQUESTED.value,
         ReviewReason.SEALED_ORDER_REQUESTED.value,
         ReviewReason.NO_ADVERSE_ACTION_REQUESTED.value,
+        ReviewReason.ONGOING_COLLECTION_REQUESTED.value,
         ReviewReason.SENSITIVE_PARTY.value,
     }
 )

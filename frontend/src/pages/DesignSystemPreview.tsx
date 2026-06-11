@@ -268,7 +268,7 @@ export default function DesignSystemPreview() {
               <EvidenceLink
                 evidenceIds={["metric:product-volume-location", "metric:sla-risk-location"]}
               />
-              <Chip tone="violet">synthetic_mock</Chip>
+              <Chip tone="violet">Synthetic / mock</Chip>
             </div>
           </Card>
           <Card variant="soft" title="Work needing attention" subtitle="Curated, prioritized">

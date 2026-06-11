@@ -118,6 +118,12 @@ class GovernanceMetricsService:
                 synthetic,
             ),
             metric(
+                "human_overrides_recorded",
+                "Human overrides recorded",
+                sum(len(r.human_overrides) for r in requests),
+                DataConfidence.FULLY_TRACKED,
+            ),
+            metric(
                 "audit_events",
                 "Audit events recorded",
                 self._audit.count(),

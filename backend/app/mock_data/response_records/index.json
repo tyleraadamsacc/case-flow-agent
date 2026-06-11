@@ -1,4 +1,6 @@
 {
   "LER-2026-004812": "gps_records_scenario_a.json",
-  "LER-2026-004863": "empty_records_scenario_f.json"
+  "LER-2026-004863": "empty_records_scenario_f.json",
+  "LER-2026-004945": "empty_records_scenario_m.json",
+  "LER-2026-004956": "subscriber_records_scenario_n.json"
 }

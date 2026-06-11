@@ -36,6 +36,7 @@ def test_scenario_a_drafts_full_package_with_eight_gps_records(
     assert all(r["data_confidence"] == "synthetic_mock" for r in package["records"])
     assert package["certification"]["status"] == "draft_pending_approval"
     assert package["chain_of_custody"]["review_status"] == "draft_pending_review"
+    assert package["validation_findings"] == []
     assert package["section_provenance"]["record_index"] == "ETL Agent"
     assert body["text_draft"]["status"] == "draft_not_final"
 

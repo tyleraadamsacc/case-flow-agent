@@ -4,12 +4,26 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "../api/client";
 import RequestQueuePage from "../pages/RequestQueuePage";
-import { makeLegalRequest } from "./fixtures";
+import { makeAgentRun, makeLegalRequest } from "./fixtures";
 
 afterEach(() => vi.restoreAllMocks());
 
 describe("RequestQueuePage", () => {
   it("renders the seeded requests with state and next human action", async () => {
+    vi.spyOn(api, "listAgentRuns").mockImplementation(async (requestId) => {
+      if (requestId === "LER-2026-004821") {
+        return [
+          makeAgentRun({
+            legal_request_id: requestId,
+            agent_id: "triaging_agent",
+            requires_human_review: true,
+            audit_event_id: "evt_review",
+          }),
+        ];
+      }
+      return [];
+    });
+
     vi.spyOn(api, "listLegalRequests").mockResolvedValue([
       makeLegalRequest({
         legal_request_id: "LER-2026-004812",
@@ -43,9 +57,12 @@ describe("RequestQueuePage", () => {
     expect(screen.getByText("LER-2026-004821")).toBeInTheDocument();
     expect(screen.getByText("Received")).toBeInTheDocument();
     expect(screen.getByText("Extract request")).toBeInTheDocument();
-    expect(screen.getByText("Analyst review pending")).toBeInTheDocument();
+    expect(screen.getAllByText("Analyst review pending").length).toBeGreaterThan(0);
     expect(screen.getByText("Review agent output")).toBeInTheDocument();
-    expect(screen.getByText("1 blocking deficiency")).toBeInTheDocument();
+    expect(screen.getByText("Blocking deficiency")).toBeInTheDocument();
+    expect(screen.getByText("Blocking deficiency review")).toBeInTheDocument();
+    expect(screen.getByText("1 audit event linked")).toBeInTheDocument();
+    expect(screen.getByText("Demo walkthrough")).toBeInTheDocument();
     expect(screen.getByText("2 of 2 requests")).toBeInTheDocument();
   });
 

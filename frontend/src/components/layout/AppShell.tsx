@@ -30,8 +30,8 @@ export default function AppShell({
       <div className="cf-shell__main">
         {topBar ?? <TopBar />}
         <div className="cf-synthetic-banner" role="note">
-          Prototype: synthetic / mock data only. Drafts require human review;
-          nothing is sent or released by this system.
+          Prototype: synthetic / mock data only. Drafts stay pending human
+          review; audit events are logged for traceability.
         </div>
         <div className="cf-shell__body">
           <main className="cf-shell__content">{children}</main>
