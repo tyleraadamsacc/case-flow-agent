@@ -51,7 +51,7 @@ export default function WorkNeedingAttentionPage() {
       <div className="cf-page-header">
         <h1>Work Needing Attention</h1>
         <p>
-          Requests where a human decision is needed next — special handling,
+          Requests where a human decision is needed next: special handling,
           blocking deficiencies, blocked agent runs, low confidence, and
           approvals pending. Highest priority first.
         </p>
@@ -65,11 +65,26 @@ export default function WorkNeedingAttentionPage() {
         </Card>
       ) : null}
 
+      {items === null && !error ? (
+        <div
+          className="cf-skeleton"
+          role="status"
+          aria-label="Loading attention items"
+        >
+          <div className="cf-skeleton__row" />
+          <div className="cf-skeleton__row" />
+        </div>
+      ) : null}
+
       {items && items.length === 0 ? (
         <Card variant="soft">
-          <p style={{ margin: 0, color: "var(--text-secondary)" }}>
-            Nothing needs attention right now.
-          </p>
+          <div className="cf-empty">
+            <h3>Nothing needs attention right now</h3>
+            <p>
+              When an agent run is blocked, a deficiency blocks production, or
+              a draft waits on approval, the request appears here first.
+            </p>
+          </div>
         </Card>
       ) : null}
 
@@ -106,7 +121,7 @@ export default function WorkNeedingAttentionPage() {
             {item.related_agent_run_ids.length > 0 ? (
               <p className="cf-attention__runs">
                 {item.related_agent_run_ids.length} related agent run
-                {item.related_agent_run_ids.length === 1 ? "" : "s"} — open the
+                {item.related_agent_run_ids.length === 1 ? "" : "s"}. Open the
                 request to inspect the rail.
               </p>
             ) : null}

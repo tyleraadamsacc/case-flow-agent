@@ -51,7 +51,7 @@ export default function EvidenceDrawer({
         </header>
         <p className="cf-drawer__hint">
           Grounding sources referenced by agent output and audit events.
-          Synthetic corpus — local retrieval.
+          Synthetic corpus, local retrieval.
         </p>
         {loading ? <p className="cf-drawer__hint">Resolving…</p> : null}
         <div className="cf-drawer__items">

@@ -86,17 +86,17 @@ export const WORKFLOW_STATE_META: Record<string, StatusMeta> = {
  * one reads blue (a draft in flight) or amber (a person must decide) —
  * there is no agent-final status to map. */
 export const DRAFT_STATUS_META: Record<string, StatusMeta> = {
-  draft_not_final: { label: "Draft — not final", tone: "blue" },
+  draft_not_final: { label: "Draft, not final", tone: "blue" },
   draft_pending_approval: { label: "Draft pending approval", tone: "blue" },
   draft_pending_analyst_review: {
     label: "Draft pending analyst review",
     tone: "blue",
   },
   recommended_pending_human: {
-    label: "Recommended — pending human",
+    label: "Recommended, pending human",
     tone: "blue",
   },
-  prepared_pending_human: { label: "Prepared — pending human", tone: "blue" },
+  prepared_pending_human: { label: "Prepared, pending human", tone: "blue" },
   approved_by_analyst: { label: "Approved by analyst", tone: "green" },
 };
 

@@ -79,7 +79,7 @@ export const AGENT_THEME: Record<AgentId, AgentTheme> = {
     officialName: "Text Content Agent",
     ordinal: 5,
     roleDescription:
-      "Drafts the response package or deficiency response — drafts only.",
+      "Drafts the response package or deficiency response; drafts only.",
     accent: "#00796B",
     accentSoft: "#E0F2F1",
   },

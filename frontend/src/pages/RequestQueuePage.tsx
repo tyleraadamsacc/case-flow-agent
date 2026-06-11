@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { api } from "../api/client";
-import type { LegalRequest } from "../api/types";
+import type { AgentRun, LegalRequest, WorkflowState } from "../api/types";
+import MiniRail from "../components/agents/MiniRail";
 import ConsoleShell from "../components/layout/ConsoleShell";
 import Card from "../components/ui/Card";
 import Chip from "../components/ui/Chip";
@@ -16,32 +17,150 @@ import {
   specialHandlingBadges,
 } from "../lib/requestDisplay";
 
+type QueueFilter = "all" | "intake" | "agents" | "review" | "finalized" | "blocked";
+
+function stateGroup(
+  state: WorkflowState,
+): Exclude<QueueFilter, "all" | "blocked"> {
+  if (state === "request_received") {
+    return "intake";
+  }
+  if (
+    state === "analyst_review_pending" ||
+    state === "changes_requested" ||
+    state === "escalated" ||
+    state === "sent_to_qa"
+  ) {
+    return "review";
+  }
+  if (state === "analyst_approved" || state === "audit_complete") {
+    return "finalized";
+  }
+  return "agents";
+}
+
+/** Blocked is an overlay, not a workflow state: a blocking deficiency or
+ * a blocked/failed agent run, whatever the request's state. */
+function isBlocked(
+  request: LegalRequest,
+  runs: Record<string, AgentRun> | undefined,
+): boolean {
+  if (blockingDeficiencyCount(request) > 0) {
+    return true;
+  }
+  return Object.values(runs ?? request.agent_runs).some(
+    (run) => run.status === "blocked" || run.status === "failed",
+  );
+}
+
+function urgencyTone(tier: string): "red" | "amber" | "neutral" {
+  const lowered = tier.toLowerCase();
+  if (lowered.includes("emergency") || lowered.includes("expedited")) {
+    return "red";
+  }
+  if (lowered.includes("high") || lowered.includes("priority")) {
+    return "amber";
+  }
+  return "neutral";
+}
+
+const PULSE_TILES: Array<{ id: QueueFilter; label: string }> = [
+  { id: "all", label: "All requests" },
+  { id: "intake", label: "New intake" },
+  { id: "agents", label: "Agent workflow" },
+  { id: "review", label: "Human decision" },
+  { id: "blocked", label: "Blocked" },
+  { id: "finalized", label: "Finalized" },
+];
+
 /** Analyst worklist (plan §13): every seeded synthetic request with its
- * state, special-handling badges, deficiency status, and next human
- * action. Rows navigate to Request Detail. */
+ * state, special-handling badges, six-agent status, deficiency status,
+ * and next human action. The pulse strip above the queue doubles as a
+ * filter — each tile answers "where does work stand" and clicks into
+ * that slice. Rows navigate to Request Detail. */
 export default function RequestQueuePage() {
   const navigate = useNavigate();
   const [requests, setRequests] = useState<LegalRequest[] | null>(null);
+  const [runsByRequest, setRunsByRequest] = useState<
+    Record<string, Record<string, AgentRun>>
+  >({});
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [group, setGroup] = useState<QueueFilter>("all");
 
   useEffect(() => {
     api
       .listLegalRequests()
-      .then(setRequests)
+      .then((list) => {
+        setRequests(list);
+        // The list endpoint does not hydrate agent_runs; fetch the run
+        // history per request and keep the latest run per agent so the
+        // mini rail reflects persisted reality.
+        return Promise.all(
+          list.map((request) =>
+            api
+              .listAgentRuns(request.legal_request_id)
+              .then((runs) => {
+                const latest: Record<string, AgentRun> = {};
+                for (const run of runs) {
+                  latest[run.agent_id] = run;
+                }
+                return [request.legal_request_id, latest] as const;
+              })
+              .catch(
+                () =>
+                  [
+                    request.legal_request_id,
+                    request.agent_runs,
+                  ] as const,
+              ),
+          ),
+        ).then((entries) => setRunsByRequest(Object.fromEntries(entries)));
+      })
       .catch((cause: Error) => setError(cause.message));
   }, []);
+
+  const counts = useMemo(() => {
+    const result: Record<QueueFilter, number> = {
+      all: requests?.length ?? 0,
+      intake: 0,
+      agents: 0,
+      review: 0,
+      blocked: 0,
+      finalized: 0,
+    };
+    for (const request of requests ?? []) {
+      result[stateGroup(request.workflow_state)] += 1;
+      if (isBlocked(request, runsByRequest[request.legal_request_id])) {
+        result.blocked += 1;
+      }
+    }
+    return result;
+  }, [requests, runsByRequest]);
 
   const filtered = useMemo(() => {
     if (!requests) {
       return null;
     }
     const needle = query.trim().toLowerCase();
-    if (!needle) {
-      return requests;
-    }
-    return requests.filter((request) =>
-      [
+    return requests.filter((request) => {
+      if (
+        group === "blocked" &&
+        !isBlocked(request, runsByRequest[request.legal_request_id])
+      ) {
+        return false;
+      }
+      if (
+        group !== "all" &&
+        group !== "blocked" &&
+        stateGroup(request.workflow_state) !== group
+      ) {
+        return false;
+      }
+      if (!needle) {
+        return true;
+      }
+      return [
         request.legal_request_id,
         agencyName(request),
         legalProcessLabel(request),
@@ -50,9 +169,9 @@ export default function RequestQueuePage() {
       ]
         .join(" ")
         .toLowerCase()
-        .includes(needle),
-    );
-  }, [requests, query]);
+        .includes(needle);
+    });
+  }, [requests, runsByRequest, query, group]);
 
   return (
     <ConsoleShell title="Request Queue">
@@ -63,6 +182,23 @@ export default function RequestQueuePage() {
           action below is drafted or prepared by agents and decided by a person.
         </p>
       </div>
+
+      {requests ? (
+        <div className="cf-pulse-strip">
+          {PULSE_TILES.map((tile) => (
+            <button
+              key={tile.id}
+              type="button"
+              className="cf-pulse"
+              aria-pressed={group === tile.id}
+              onClick={() => setGroup(tile.id)}
+            >
+              <span className="cf-pulse__value">{counts[tile.id]}</span>
+              <span className="cf-pulse__label">{tile.label}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <div className="cf-toolbar">
         <input
@@ -90,16 +226,24 @@ export default function RequestQueuePage() {
       ) : null}
 
       {!error && filtered === null ? (
-        <Card variant="soft">
-          <p style={{ margin: 0, color: "var(--text-secondary)" }}>Loading…</p>
-        </Card>
+        <div className="cf-skeleton" role="status" aria-label="Loading requests">
+          <div className="cf-skeleton__row" />
+          <div className="cf-skeleton__row" />
+          <div className="cf-skeleton__row" />
+          <div className="cf-skeleton__row" />
+        </div>
       ) : null}
 
       {filtered && filtered.length === 0 ? (
         <Card variant="soft">
-          <p style={{ margin: 0, color: "var(--text-secondary)" }}>
-            No requests match this filter.
-          </p>
+          <div className="cf-empty">
+            <h3>No requests in this view</h3>
+            <p>
+              {requests && requests.length > 0
+                ? "Clear the filter or pick another tile above to see the rest of the queue."
+                : "Seeded requests appear here when the backend starts (make dev-backend)."}
+            </p>
+          </div>
         </Card>
       ) : null}
 
@@ -120,12 +264,14 @@ export default function RequestQueuePage() {
                 <span className="cf-queue__meta">
                   {legalProcessLabel(request)} · received{" "}
                   {formatDate(request.date_received)}
-                  {request.urgency_tier
-                    ? ` · urgency: ${request.urgency_tier}`
-                    : ""}
                 </span>
               </span>
               <span className="cf-queue__chips">
+                {request.urgency_tier ? (
+                  <Chip tone={urgencyTone(request.urgency_tier)} dot>
+                    {request.urgency_tier}
+                  </Chip>
+                ) : null}
                 {request.product_domains.slice(0, 2).map((domain) => (
                   <Chip key={domain} tone="cyan">
                     {domain}
@@ -144,6 +290,14 @@ export default function RequestQueuePage() {
                     {blocking} blocking deficienc{blocking === 1 ? "y" : "ies"}
                   </Chip>
                 ) : null}
+              </span>
+              <span className="cf-queue__minirail">
+                <MiniRail
+                  runs={
+                    runsByRequest[request.legal_request_id] ??
+                    request.agent_runs
+                  }
+                />
               </span>
               <StatusBadge status={request.workflow_state} />
               <span className="cf-queue__next">
