@@ -56,7 +56,9 @@ export default function AgentRunCard({
   onOpenAudit,
 }: AgentRunCardProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const detailsId = useId();
+  const summaryId = useId();
   const theme = agentTheme(agentId);
   const accent = theme?.accent ?? "var(--text-muted)";
   const accentSoft = theme?.accentSoft ?? "var(--surface-soft)";
@@ -66,6 +68,17 @@ export default function AgentRunCard({
       (riskFlags && riskFlags.length > 0) ||
       timestamp,
   );
+  // Verbose outputs (the Indexing Agent's category list, for example)
+  // clamp to four lines so one agent cannot stretch the whole rail row.
+  const longSummary = (outputSummary?.length ?? 0) > 220;
+  const hasConfidence = confidence !== null && confidence !== undefined;
+  const hasMeta = Boolean(
+    requiresHumanReview ||
+      (evidenceIds && evidenceIds.length > 0) ||
+      auditEventId ||
+      auditAction,
+  );
+  const hasFooter = hasConfidence || hasMeta || hasDetails;
 
   return (
     <article
@@ -74,15 +87,17 @@ export default function AgentRunCard({
       aria-label={`${agentName}: ${status.replace("_", " ")}`}
     >
       <div className="cf-agent-card__header">
-        <span
-          className="cf-agent-card__ordinal"
-          style={{ background: accentSoft, color: accent }}
-          aria-hidden="true"
-        >
-          {ordinal}
-        </span>
+        <div className="cf-agent-card__topline">
+          <span
+            className="cf-agent-card__ordinal"
+            style={{ background: accentSoft, color: accent }}
+            aria-hidden="true"
+          >
+            {ordinal}
+          </span>
+          <StatusBadge status={status} />
+        </div>
         <span className="cf-agent-card__name">{agentName}</span>
-        <StatusBadge status={status} />
       </div>
 
       {roleDescription ? (
@@ -101,79 +116,113 @@ export default function AgentRunCard({
       ) : null}
 
       {outputSummary ? (
-        <p className="cf-agent-card__summary">{outputSummary}</p>
+        <p
+          id={summaryId}
+          className={
+            longSummary && !summaryOpen
+              ? "cf-agent-card__summary cf-agent-card__summary--clamp"
+              : "cf-agent-card__summary"
+          }
+        >
+          {outputSummary}
+        </p>
+      ) : null}
+      {longSummary ? (
+        <button
+          type="button"
+          className="cf-agent-card__details-toggle"
+          aria-expanded={summaryOpen}
+          aria-controls={summaryId}
+          aria-label={
+            summaryOpen
+              ? `Collapse output for ${agentName}`
+              : `Show full output for ${agentName}`
+          }
+          onClick={() => setSummaryOpen((value) => !value)}
+        >
+          {summaryOpen ? "Collapse output" : "Show full output"}
+        </button>
       ) : null}
 
-      {confidence !== null && confidence !== undefined ? (
-        <ConfidenceBar value={confidence} />
-      ) : null}
+      {hasFooter ? (
+        <div className="cf-agent-card__footer">
+          {hasConfidence ? <ConfidenceBar value={confidence} /> : null}
 
-      <div className="cf-agent-card__meta">
-        {requiresHumanReview ? (
-          <Chip tone="amber" dot>
-            Human review required
-          </Chip>
-        ) : null}
-        <EvidenceLink evidenceIds={evidenceIds} onOpen={onOpenEvidence} />
-        <AuditLink
-          auditEventId={auditEventId}
-          action={auditAction}
-          onOpen={onOpenAudit}
-        />
-      </div>
-
-      {hasDetails ? (
-        <>
-          <button
-            type="button"
-            className="cf-agent-card__details-toggle"
-            aria-expanded={detailsOpen}
-            aria-controls={detailsId}
-            onClick={() => setDetailsOpen((value) => !value)}
-          >
-            {detailsOpen ? "Hide details" : "Details"}
-          </button>
-          {detailsOpen ? (
-            <dl className="cf-agent-card__details" id={detailsId}>
-              {inputSummary ? (
-                <div>
-                  <dt>Input</dt>
-                  <dd>{inputSummary}</dd>
-                </div>
+          {hasMeta ? (
+            <div className="cf-agent-card__meta">
+              {requiresHumanReview ? (
+                <Chip tone="amber" dot>
+                  Human review required
+                </Chip>
               ) : null}
-              {reviewReasons && reviewReasons.length > 0 ? (
-                <div>
-                  <dt>Review reasons</dt>
-                  <dd className="cf-preview__row">
-                    {reviewReasons.map((reason) => (
-                      <Chip key={reason} tone="amber">
-                        {reason}
-                      </Chip>
-                    ))}
-                  </dd>
-                </div>
-              ) : null}
-              {riskFlags && riskFlags.length > 0 ? (
-                <div>
-                  <dt>Risk flags</dt>
-                  <dd className="cf-preview__row">
-                    {riskFlags.map((flag) => (
-                      <Chip key={flag} tone="red">
-                        {flag}
-                      </Chip>
-                    ))}
-                  </dd>
-                </div>
-              ) : null}
-              {timestamp ? (
-                <div>
-                  <dt>Completed</dt>
-                  <dd className="cf-agent-card__timestamp">{timestamp}</dd>
-                </div>
-              ) : null}
-            </dl>
+              <EvidenceLink evidenceIds={evidenceIds} onOpen={onOpenEvidence} />
+              <AuditLink
+                auditEventId={auditEventId}
+                action={auditAction}
+                onOpen={onOpenAudit}
+              />
+            </div>
           ) : null}
-        </>
+
+          {hasDetails ? (
+            <>
+              <button
+                type="button"
+                className="cf-agent-card__details-toggle"
+                aria-expanded={detailsOpen}
+                aria-controls={detailsId}
+                aria-label={
+                  detailsOpen
+                    ? `Hide details for ${agentName}`
+                    : `Details for ${agentName}`
+                }
+                onClick={() => setDetailsOpen((value) => !value)}
+              >
+                {detailsOpen ? "Hide details" : "Details"}
+              </button>
+              {detailsOpen ? (
+                <dl className="cf-agent-card__details" id={detailsId}>
+                  {inputSummary ? (
+                    <div>
+                      <dt>Input</dt>
+                      <dd>{inputSummary}</dd>
+                    </div>
+                  ) : null}
+                  {reviewReasons && reviewReasons.length > 0 ? (
+                    <div>
+                      <dt>Review reasons</dt>
+                      <dd className="cf-preview__row">
+                        {reviewReasons.map((reason) => (
+                          <Chip key={reason} tone="amber">
+                            {reason}
+                          </Chip>
+                        ))}
+                      </dd>
+                    </div>
+                  ) : null}
+                  {riskFlags && riskFlags.length > 0 ? (
+                    <div>
+                      <dt>Risk flags</dt>
+                      <dd className="cf-preview__row">
+                        {riskFlags.map((flag) => (
+                          <Chip key={flag} tone="red">
+                            {flag}
+                          </Chip>
+                        ))}
+                      </dd>
+                    </div>
+                  ) : null}
+                  {timestamp ? (
+                    <div>
+                      <dt>Completed</dt>
+                      <dd className="cf-agent-card__timestamp">{timestamp}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+              ) : null}
+            </>
+          ) : null}
+        </div>
       ) : null}
     </article>
   );

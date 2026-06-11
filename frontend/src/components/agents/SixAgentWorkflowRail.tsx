@@ -31,23 +31,28 @@ export default function SixAgentWorkflowRail({
   onOpenAudit,
 }: SixAgentWorkflowRailProps) {
   return (
-    <ol className="cf-rail" aria-label="Six-Agent Workflow Rail">
-      {AGENT_RAIL_ORDER.map((agentId) => {
-        const theme = AGENT_THEME[agentId];
-        const run = runs.find((candidate) => candidate.agentId === agentId);
-        return (
-          <li className="cf-rail__item" key={agentId}>
-            <AgentRunCard
-              {...(run ?? { agentId, status: "waiting" })}
-              agentName={theme.officialName}
-              ordinal={theme.ordinal}
-              roleDescription={theme.roleDescription}
-              onOpenEvidence={run?.onOpenEvidence ?? onOpenEvidence}
-              onOpenAudit={run?.onOpenAudit ?? onOpenAudit}
-            />
-          </li>
-        );
-      })}
-    </ol>
+    // The wrapper is a size container: the rail picks 3x2, six-across,
+    // or vertical from its own width (it renders beside a context panel
+    // on Request Detail and full-width elsewhere).
+    <div className="cf-rail-viewport">
+      <ol className="cf-rail" aria-label="Six-Agent Workflow Rail">
+        {AGENT_RAIL_ORDER.map((agentId) => {
+          const theme = AGENT_THEME[agentId];
+          const run = runs.find((candidate) => candidate.agentId === agentId);
+          return (
+            <li className="cf-rail__item" key={agentId}>
+              <AgentRunCard
+                {...(run ?? { agentId, status: "waiting" })}
+                agentName={theme.officialName}
+                ordinal={theme.ordinal}
+                roleDescription={theme.roleDescription}
+                onOpenEvidence={run?.onOpenEvidence ?? onOpenEvidence}
+                onOpenAudit={run?.onOpenAudit ?? onOpenAudit}
+              />
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }

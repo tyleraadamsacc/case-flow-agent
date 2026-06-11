@@ -352,6 +352,9 @@ button.cf-chip {
   font-size: var(--font-small);
   color: var(--blue);
   cursor: pointer;
+  min-width: 0;
+  max-width: 100%;
+  text-align: left;
 }
 
 .cf-meta-link:hover {
@@ -360,6 +363,14 @@ button.cf-chip {
 
 .cf-meta-link__icon {
   flex: none;
+}
+
+/* Long evidence/audit ids truncate on one line (full value stays in the
+   title tooltip) instead of wrapping center-aligned inside the button. */
+.cf-meta-link__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ---------- App shell ---------- */
@@ -646,12 +657,23 @@ button.cf-chip {
   background: var(--yellow-soft);
 }
 
+/* Stacked header: ordinal top-left, status badge top-right, the
+   official name on its own line below. The badge never fights the name
+   for width, so the header holds its shape at any card width — the
+   long official names ("Note Taking and Data Entry Agent") just wrap
+   under the ordinal. */
 .cf-agent-card__header {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--space-2);
   min-width: 0;
+}
+
+.cf-agent-card__topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
 
 .cf-agent-card__ordinal {
@@ -669,7 +691,7 @@ button.cf-chip {
 .cf-agent-card__name {
   font-size: var(--font-body);
   font-weight: 500;
-  flex: 1;
+  line-height: 1.35;
   min-width: 0;
 }
 
@@ -683,6 +705,30 @@ button.cf-chip {
   font-size: var(--font-body);
   color: var(--text-primary);
   margin: 0;
+}
+
+/* Long outputs clamp to four lines so one verbose agent cannot stretch
+   the whole rail row; "Show full output" reveals the rest. The full
+   text stays in the DOM (and in screen-reader order). */
+.cf-agent-card__summary--clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+}
+
+/* Bottom-anchored block: confidence, links, and details sit at the same
+   height on every card in a rail row, however short the content above.
+   No padding-top — the card's own flex gap already separates it; adding
+   padding would double the gap to 16px on the row's tallest card (where
+   margin-top:auto collapses to 0). */
+.cf-agent-card__footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .cf-agent-card__blocked-reason {
@@ -750,8 +796,15 @@ button.cf-chip {
 
 /* ---------- Six-Agent Workflow Rail ---------- */
 
-/* 3×2 grid by default — cards need width to keep the official names and
-   summaries readable. Six-across only on very wide screens. */
+/* Columns follow the rail's own width, not the viewport — the rail sits
+   beside a context panel on Request Detail and full-width elsewhere, so
+   a viewport breakpoint picks the wrong layout on one of them. 3×2 by
+   default; six-across only when every card still gets ~200px; vertical
+   when cards would drop below readable width. */
+.cf-rail-viewport {
+  container-type: inline-size;
+}
+
 .cf-rail {
   list-style: none;
   margin: 0;
@@ -759,6 +812,16 @@ button.cf-chip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-3);
+}
+
+/* Viewport fallback for engines without container-query support (SSR,
+   embedded WebViews): collapse to a single column on a narrow viewport
+   so the rail never locks at three squeezed columns. The @container
+   rules below override this wherever container queries are supported. */
+@media (max-width: 760px) {
+  .cf-rail {
+    grid-template-columns: 1fr;
+  }
 }
 
 .cf-rail__item {
@@ -787,17 +850,17 @@ button.cf-chip {
   display: none;
 }
 
-@media (min-width: 1760px) {
+@container (min-width: 1280px) {
   .cf-rail {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
-  .cf-rail__item:nth-child(3n)::after {
+  .cf-rail__item:nth-child(3n):not(:last-child)::after {
     display: block;
   }
 }
 
-@media (max-width: 760px) {
+@container (max-width: 720px) {
   .cf-rail {
     grid-template-columns: 1fr;
   }
@@ -1010,6 +1073,13 @@ button.cf-chip {
   margin-bottom: var(--space-6);
 }
 
+/* Grid items refuse to shrink below min-content by default; the source
+   document's unbroken character runs would otherwise push the panel
+   past the viewport on narrow screens. */
+.cf-detail-grid > * {
+  min-width: 0;
+}
+
 @media (max-width: 1100px) {
   .cf-detail-grid {
     grid-template-columns: 1fr;
@@ -1044,6 +1114,9 @@ button.cf-chip {
   max-height: 420px;
   overflow-y: auto;
   white-space: pre-wrap;
+  /* Template documents contain long unbroken runs (asterisk dividers);
+     break them rather than widen the panel. */
+  overflow-wrap: anywhere;
 }
 
 .cf-doc__mark {
