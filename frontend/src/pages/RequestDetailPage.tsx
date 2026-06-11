@@ -10,6 +10,7 @@ import TextDraftView from "../components/package/TextDraftView";
 import ExtractedFieldsPanel from "../components/request/ExtractedFieldsPanel";
 import ReviewPanel from "../components/request/ReviewPanel";
 import SourceDocumentPanel from "../components/request/SourceDocumentPanel";
+import WorkflowProgress from "../components/request/WorkflowProgress";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Chip from "../components/ui/Chip";
@@ -128,17 +129,53 @@ export default function RequestDetailPage() {
         />
       }
     >
-      <header className="cf-detail-header">
+      <header className="cf-hero cf-detail-header">
         <div className="cf-detail-header__title">
           <h1>{request.legal_request_id}</h1>
           <StatusBadge status={state} />
+          {request.urgency_tier ? (
+            <Chip tone="red" dot>
+              {request.urgency_tier}
+            </Chip>
+          ) : null}
         </div>
-        <p className="cf-detail-header__meta">
-          {agencyName(request)} · {legalProcessLabel(request)} · received{" "}
-          {formatDate(request.date_received)}
-          {request.urgency_tier ? ` · urgency: ${request.urgency_tier}` : ""}
-          {request.owner ? ` · owner: ${request.owner}` : ""}
-        </p>
+        <div className="cf-detail-header__meta">
+          <WorkflowProgress state={state} />
+        </div>
+        <div className="cf-hero__facts">
+          <div className="cf-fact">
+            <p className="cf-fact__label">Requesting agency</p>
+            <p className="cf-fact__value" title={agencyName(request)}>
+              {agencyName(request)}
+            </p>
+          </div>
+          <div className="cf-fact">
+            <p className="cf-fact__label">Legal process</p>
+            <p className="cf-fact__value">{legalProcessLabel(request)}</p>
+          </div>
+          <div className="cf-fact">
+            <p className="cf-fact__label">Case number</p>
+            <p className="cf-fact__value">
+              {request.requesting_agency?.case_number ?? "Pending extraction"}
+            </p>
+          </div>
+          <div className="cf-fact">
+            <p className="cf-fact__label">Received</p>
+            <p className="cf-fact__value">{formatDate(request.date_received)}</p>
+          </div>
+          <div className="cf-fact">
+            <p className="cf-fact__label">Production deadline</p>
+            <p className="cf-fact__value">
+              {request.special_handling.production_deadline_days
+                ? `${request.special_handling.production_deadline_days} days`
+                : "None stated"}
+            </p>
+          </div>
+          <div className="cf-fact">
+            <p className="cf-fact__label">Owner</p>
+            <p className="cf-fact__value">{request.owner ?? "Unassigned"}</p>
+          </div>
+        </div>
         <div className="cf-detail-header__actions">
           <Button
             variant={canExtract ? "filled" : "tonal"}
@@ -178,7 +215,7 @@ export default function RequestDetailPage() {
         <h2>Six-Agent Workflow Rail</h2>
         <p className="cf-detail-section__hint">
           {hasRuns
-            ? "Latest persisted run per agent — every run carries its audit event."
+            ? "Latest persisted run per agent; every run carries its audit event."
             : "Agents have not run yet. Each agent will appear here with status, output, evidence, and its audit event."}
         </p>
         <SixAgentWorkflowRail runs={toRailRuns(request.agent_runs, auditActions)} />
@@ -187,7 +224,7 @@ export default function RequestDetailPage() {
       <section className="cf-detail-section">
         <h2>Drafted artifacts</h2>
         <p className="cf-detail-section__hint">
-          All drafts are pending human review — no draft can be finalized or
+          All drafts are pending human review; no draft can be finalized or
           sent by an agent.
         </p>
         <div className="cf-preview__row" style={{ marginBottom: "var(--space-4)" }}>
@@ -234,7 +271,7 @@ export default function RequestDetailPage() {
         {request.note_drafts.length > 0 ? (
           <Card
             title="Drafted notes"
-            subtitle="Note Taking and Data Entry Agent — pending human approval"
+            subtitle="Note Taking and Data Entry Agent, pending human approval"
           >
             <ul className="cf-note-list">
               {request.note_drafts.map((note) => (
