@@ -45,7 +45,7 @@ export default function ReviewPanel({
       const updated = await call();
       onUpdated(updated);
       setComments("");
-      setNotice(`${name} recorded — audit event logged.`);
+      setNotice(`${name} recorded. Audit event logged.`);
     } catch (cause) {
       if (cause instanceof ApiError) {
         const detail =
@@ -72,15 +72,16 @@ export default function ReviewPanel({
 
         {routing ? (
           <p className="cf-review__recommendation">
-            Recommended route: <strong>{routing.target_queue ?? "—"}</strong>
+            Recommended route:{" "}
+            <strong>{routing.target_queue ?? "pending"}</strong>
             {routing.reason ? (
-              <span className="cf-fields__muted"> — {routing.reason}</span>
+              <span className="cf-fields__muted"> · {routing.reason}</span>
             ) : null}{" "}
             <Chip tone="blue">Pending human approval</Chip>
           </p>
         ) : (
           <p className="cf-review__recommendation cf-fields__muted">
-            No route recommendation yet — run the six-agent workflow.
+            No route recommendation yet. Run the six-agent workflow.
           </p>
         )}
 
@@ -194,7 +195,7 @@ export default function ReviewPanel({
           </Button>
         </div>
         <p className="cf-review__hint">
-          Approving the route records your decision and clears agent holds —
+          Approving the route records your decision and clears agent holds;
           re-run the six-agent workflow afterwards if any run was blocked.
           Finalize completes the audit once nothing is blocked.
         </p>

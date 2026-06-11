@@ -96,9 +96,15 @@ export default function GovernanceInsightsPage() {
       ) : null}
 
       {!data && !error ? (
-        <Card variant="soft">
-          <p style={{ margin: 0, color: "var(--text-secondary)" }}>Loading…</p>
-        </Card>
+        <div
+          className="cf-skeleton"
+          role="status"
+          aria-label="Loading governance data"
+        >
+          <div className="cf-skeleton__row cf-skeleton__row--short" />
+          <div className="cf-skeleton__row" />
+          <div className="cf-skeleton__row" />
+        </div>
       ) : null}
 
       {data ? (
@@ -108,7 +114,19 @@ export default function GovernanceInsightsPage() {
               <MetricCard key={metric.metric_id} metric={metric} />
             ))}
             <Card className="cf-metric" title="Work needing attention">
-              <span className="cf-metric__value">{data.attentionCount}</span>
+              <span
+                className="cf-metric__value"
+                style={
+                  data.attentionCount > 0 ? { color: "var(--red)" } : undefined
+                }
+              >
+                {data.attentionCount}
+              </span>
+              <p className="cf-metric__caption">
+                {data.attentionCount > 0
+                  ? "Human decisions waiting"
+                  : "Nothing waiting on a human"}
+              </p>
               <div className="cf-preview__row">
                 <Link to="/attention">Open the attention list</Link>
               </div>
@@ -124,7 +142,7 @@ export default function GovernanceInsightsPage() {
               <Card
                 variant="insight"
                 title={`${metricLabel(topDomain)} leads request volume`}
-                subtitle="Deterministic insight from synthetic metrics — pending human interpretation"
+                subtitle="Deterministic insight from synthetic metrics, pending human interpretation"
               >
                 <p style={{ margin: "0 0 var(--space-3)", color: "var(--text-secondary)" }}>
                   {metricLabel(topDomain)} accounts for {topDomain.value} of the

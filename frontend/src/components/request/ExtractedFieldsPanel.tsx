@@ -56,7 +56,7 @@ export default function ExtractedFieldsPanel({
         </Group>
 
         <Group label="Requesting agency">
-          {request.requesting_agency?.agency ?? "—"}
+          {request.requesting_agency?.agency ?? "Not extracted"}
           {request.requesting_agency?.case_number ? (
             <span className="cf-fields__muted">
               {" "}
@@ -87,7 +87,7 @@ export default function ExtractedFieldsPanel({
 
         <Group label="Requested data categories">
           {request.requested_data_categories.length === 0
-            ? "—"
+            ? "None extracted"
             : request.requested_data_categories.map((category) => (
                 <Chip
                   key={category.category}
@@ -138,7 +138,7 @@ export default function ExtractedFieldsPanel({
 
         <Group label="Legal authorities">
           {request.legal_authorities.length === 0
-            ? "—"
+            ? "None cited"
             : request.legal_authorities.map((authority) => (
                 <Chip
                   key={authority.citation}
@@ -162,7 +162,7 @@ export default function ExtractedFieldsPanel({
                   {finding.suggested_resolution ? (
                     <span className="cf-fields__muted">
                       {" "}
-                      — {finding.suggested_resolution}
+                      Suggested: {finding.suggested_resolution}
                     </span>
                   ) : null}
                 </li>

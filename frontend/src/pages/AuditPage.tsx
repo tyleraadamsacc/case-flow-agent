@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { governanceApi } from "../api/client";
@@ -7,10 +7,31 @@ import ConsoleShell from "../components/layout/ConsoleShell";
 import Card from "../components/ui/Card";
 import Chip from "../components/ui/Chip";
 import EvidenceLink from "../components/ui/EvidenceLink";
-import { OFFICIAL_AGENT_NAMES } from "../theme/agentTheme";
+import { OFFICIAL_AGENT_NAMES, agentTheme } from "../theme/agentTheme";
 import { formatDateTime, humanizeToken } from "../lib/requestDisplay";
 
 const ACTOR_TYPES = ["system", "agent", "service", "human"] as const;
+
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** Day label derived from the ISO string directly — no locale surprises. */
+function dayLabel(timestamp: string): string {
+  const [year, month, day] = timestamp.slice(0, 10).split("-");
+  return `${MONTHS[Number(month) - 1]} ${Number(day)}, ${year}`;
+}
 
 function actorTone(actorType: AuditEvent["actor_type"]) {
   switch (actorType) {
@@ -32,9 +53,18 @@ function TimelineEvent({ event }: { event: AuditEvent }) {
     event.after_state !== null &&
     event.before_state !== event.after_state;
 
+  const accent =
+    event.actor_type === "agent"
+      ? agentTheme(event.actor_id)?.accent
+      : undefined;
+
   return (
     <li className="cf-timeline__event">
-      <span className="cf-timeline__dot" aria-hidden="true" />
+      <span
+        className={`cf-timeline__dot cf-timeline__dot--${event.actor_type}`}
+        style={accent ? { background: accent } : undefined}
+        aria-hidden="true"
+      />
       <div className="cf-timeline__body">
         <div className="cf-timeline__head">
           <span className="cf-timeline__time">
@@ -82,7 +112,7 @@ function TimelineEvent({ event }: { event: AuditEvent }) {
             <div>
               <dt>State</dt>
               <dd>
-                {event.before_state ?? "—"} → {event.after_state ?? "—"}
+                {event.before_state ?? "none"} → {event.after_state ?? "none"}
               </dd>
             </div>
             {event.confidence !== null ? (
@@ -132,7 +162,7 @@ export default function AuditPage() {
       <div className="cf-page-header">
         <h1>Audit</h1>
         <p>
-          Every agent action and every human action writes an audit event —
+          Every agent action and every human action writes an audit event;
           this is the complete trail. Filter by any of the six agents, actor
           type, or request.
         </p>
@@ -203,12 +233,32 @@ export default function AuditPage() {
         </Card>
       ) : null}
 
+      {events === null && !error ? (
+        <div className="cf-skeleton" role="status" aria-label="Loading audit events">
+          <div className="cf-skeleton__row" />
+          <div className="cf-skeleton__row" />
+          <div className="cf-skeleton__row" />
+        </div>
+      ) : null}
+
       {events && events.length > 0 ? (
         <Card>
           <ol className="cf-timeline">
-            {events.map((event) => (
-              <TimelineEvent key={event.audit_event_id} event={event} />
-            ))}
+            {events.map((event, index) => {
+              const label = dayLabel(event.timestamp);
+              const newDay =
+                index === 0 || dayLabel(events[index - 1].timestamp) !== label;
+              return (
+                <Fragment key={event.audit_event_id}>
+                  {newDay ? (
+                    <li className="cf-timeline__day" aria-hidden="true">
+                      {label}
+                    </li>
+                  ) : null}
+                  <TimelineEvent event={event} />
+                </Fragment>
+              );
+            })}
           </ol>
         </Card>
       ) : null}

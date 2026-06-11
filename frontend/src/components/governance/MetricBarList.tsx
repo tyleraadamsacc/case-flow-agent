@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import type { GovernanceMetric } from "../../api/types";
 import { humanizeToken } from "../../lib/requestDisplay";
 import Card from "../ui/Card";
@@ -13,8 +15,13 @@ export function metricLabel(metric: GovernanceMetric): string {
   return metric.title;
 }
 
+const VISIBLE_DEFAULT = 6;
+
 /** Horizontal bar list for dimensioned metrics (product volume,
- * processing time, bottleneck dwell) — calm CSS bars, no chart library. */
+ * processing time, bottleneck dwell) — calm CSS bars, no chart library.
+ * Long tails collapse behind a show-all toggle so the card stays an
+ * insight, not a data dump; the toggle always names how many rows it
+ * hides. */
 export default function MetricBarList({
   title,
   subtitle,
@@ -26,6 +33,10 @@ export default function MetricBarList({
   metrics: GovernanceMetric[];
   unit?: string;
 }) {
+  const [showAll, setShowAll] = useState(false);
+  const sorted = [...metrics].sort((a, b) => b.value - a.value);
+  const visible = showAll ? sorted : sorted.slice(0, VISIBLE_DEFAULT);
+  const hidden = sorted.length - visible.length;
   const max = Math.max(...metrics.map((metric) => metric.value), 1);
   const confidence = metrics[0]?.data_confidence;
 
@@ -33,11 +44,11 @@ export default function MetricBarList({
     <Card title={title} subtitle={subtitle}>
       {metrics.length === 0 ? (
         <p style={{ margin: 0, color: "var(--text-secondary)" }}>
-          No data yet — process a request to populate this view.
+          No data yet. Process a request to populate this view.
         </p>
       ) : (
         <ul className="cf-barlist">
-          {metrics.map((metric) => (
+          {visible.map((metric) => (
             <li key={metric.metric_id} className="cf-barlist__item">
               <span className="cf-barlist__label" title={metric.title}>
                 {metricLabel(metric)}
@@ -58,6 +69,18 @@ export default function MetricBarList({
           ))}
         </ul>
       )}
+      {hidden > 0 || showAll ? (
+        <button
+          type="button"
+          className="cf-agent-card__details-toggle"
+          style={{ marginTop: "var(--space-2)" }}
+          onClick={() => setShowAll((value) => !value)}
+        >
+          {showAll
+            ? `Show top ${VISIBLE_DEFAULT}`
+            : `Show all ${sorted.length} (${hidden} more)`}
+        </button>
+      ) : null}
       {confidence ? (
         <div style={{ marginTop: "var(--space-3)" }}>
           <Chip tone="violet" title="Data confidence">

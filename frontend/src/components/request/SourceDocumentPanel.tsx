@@ -67,7 +67,7 @@ export default function SourceDocumentPanel({
     <Card
       title="Source request document"
       subtitle={
-        request.raw_source_uri ?? "Synthetic LERS request — mock data only"
+        request.raw_source_uri ?? "Synthetic LERS request (mock data only)"
       }
     >
       {text ? (

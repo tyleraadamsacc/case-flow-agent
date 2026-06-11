@@ -71,7 +71,7 @@ export default function AgentRunCard({
     <article
       className={`cf-agent-card cf-agent-card--${status}`}
       data-agent-id={agentId}
-      aria-label={`${agentName} — ${status.replace("_", " ")}`}
+      aria-label={`${agentName}: ${status.replace("_", " ")}`}
     >
       <div className="cf-agent-card__header">
         <span
