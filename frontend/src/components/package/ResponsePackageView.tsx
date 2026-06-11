@@ -1,7 +1,10 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
 
-import type { ProductionPackage } from "../../api/types";
+import { api, ApiError } from "../../api/client";
+import type { LegalRequest, ProductionPackage } from "../../api/types";
 import { formatDate, formatDateTime, humanizeToken } from "../../lib/requestDisplay";
+import Button from "../ui/Button";
 import Card from "../ui/Card";
 import Chip from "../ui/Chip";
 import StatusBadge from "../ui/StatusBadge";
@@ -37,10 +40,25 @@ function Section({
  * finalize/release affordance, because none exists in the backend. */
 export default function ResponsePackageView({
   pkg,
+  onUpdated,
 }: {
   pkg: ProductionPackage;
+  onUpdated?: (request: LegalRequest) => void;
 }) {
-  const provenance = pkg.section_provenance;
+  const provenance = pkg.section_provenance ?? {};
+  const validationFindings = pkg.validation_findings ?? [];
+  const subjectIdentifiers = pkg.subject_identifiers ?? [];
+  const records = pkg.records ?? [];
+  const fieldDefinitions = pkg.field_definitions ?? [];
+  const riskFlags = pkg.risk_flags ?? [];
+  const [summaryText, setSummaryText] = useState(
+    pkg.production_summary.ordinary_course_statement ?? "",
+  );
+  const [representative, setRepresentative] = useState(
+    pkg.certification.authorized_representative ?? "",
+  );
+  const [busy, setBusy] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   return (
     <Card className="cf-package">
@@ -59,6 +77,30 @@ export default function ResponsePackageView({
         <StatusBadge status={pkg.status} />
       </div>
 
+      {validationFindings.length > 0 ? (
+        <Section name="Validation findings">
+          <ul
+            className="cf-deficiency-list"
+            aria-label="Package validation findings"
+          >
+            {validationFindings.map((finding) => (
+              <li key={finding.code}>
+                <Chip
+                  tone={finding.severity === "blocking" ? "red" : "amber"}
+                  dot
+                >
+                  {humanizeToken(finding.severity)}
+                </Chip>{" "}
+                <span className="cf-fields__muted">
+                  {humanizeToken(finding.section)}
+                </span>
+                : {finding.message}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      ) : null}
+
       <Section name="Requesting agency" provenance={provenance.requesting_agency}>
         <p className="cf-package__text">
           {pkg.requesting_agency?.agency ?? "Not recorded"}
@@ -73,7 +115,7 @@ export default function ResponsePackageView({
         provenance={provenance.subject_identifiers}
       >
         <div className="cf-preview__row">
-          {pkg.subject_identifiers.map((identifier) => (
+          {subjectIdentifiers.map((identifier) => (
             <Chip key={`${identifier.type}-${identifier.value}`} tone="neutral">
               {humanizeToken(identifier.type)}: {identifier.value}
             </Chip>
@@ -98,13 +140,37 @@ export default function ResponsePackageView({
             ? ` ${pkg.production_summary.ordinary_course_statement}`
             : ""}
         </p>
+        {onUpdated ? (
+          <div className="cf-inline-edit">
+            <input
+              className="cf-input"
+              value={summaryText}
+              aria-label="Override production summary text"
+              onChange={(event) => setSummaryText(event.target.value)}
+            />
+            <Button
+              size="sm"
+              variant="outlined"
+              disabled={busy !== null || !summaryText.trim()}
+              onClick={() =>
+                void applyOverride("summary", {
+                  target: "production_summary_text",
+                  text_value: summaryText.trim(),
+                  reason: "Reviewer corrected the production summary wording.",
+                })
+              }
+            >
+              Apply
+            </Button>
+          </div>
+        ) : null}
       </Section>
 
       <Section
         name="Index of produced records"
         provenance={provenance.record_index}
       >
-        {pkg.records.length === 0 ? (
+        {records.length === 0 ? (
           <p className="cf-package__text">
             No responsive records: no-records response draft.
           </p>
@@ -123,7 +189,7 @@ export default function ResponsePackageView({
                 </tr>
               </thead>
               <tbody>
-                {pkg.records.map((record) => (
+                {records.map((record) => (
                   <tr key={record.record_id}>
                     <td>{record.record_id}</td>
                     <td>{formatDateTime(record.timestamp_utc)}</td>
@@ -147,7 +213,7 @@ export default function ResponsePackageView({
         provenance={provenance.field_definitions}
       >
         <dl className="cf-package__definitions">
-          {pkg.field_definitions.map((definition) => (
+          {fieldDefinitions.map((definition) => (
             <div key={definition.name}>
               <dt>{definition.name}</dt>
               <dd>{definition.definition}</dd>
@@ -178,17 +244,68 @@ export default function ResponsePackageView({
           </Chip>
           <StatusBadge status={pkg.certification.status} />
         </div>
+        {onUpdated ? (
+          <div className="cf-inline-edit">
+            <input
+              className="cf-input"
+              value={representative}
+              aria-label="Override certification representative"
+              onChange={(event) => setRepresentative(event.target.value)}
+            />
+            <Button
+              size="sm"
+              variant="outlined"
+              disabled={busy !== null || !representative.trim()}
+              onClick={() =>
+                void applyOverride("representative", {
+                  target: "certification_representative",
+                  text_value: representative.trim(),
+                  reason: "Reviewer corrected the certification representative.",
+                })
+              }
+            >
+              Apply
+            </Button>
+          </div>
+        ) : null}
       </Section>
 
-      {pkg.risk_flags.length > 0 ? (
+      {riskFlags.length > 0 ? (
         <div className="cf-preview__row">
-          {pkg.risk_flags.map((flag) => (
+          {riskFlags.map((flag) => (
             <Chip key={flag} tone="red" dot>
               {humanizeToken(flag)}
             </Chip>
           ))}
         </div>
       ) : null}
+      {message ? <p className="cf-review__notice">{message}</p> : null}
     </Card>
   );
+
+  async function applyOverride(
+    name: string,
+    body: Parameters<typeof api.override>[1],
+  ) {
+    if (!onUpdated) {
+      return;
+    }
+    setBusy(name);
+    setMessage(null);
+    try {
+      const response = await api.override(pkg.request_id, body);
+      onUpdated(response.legal_request);
+      setMessage("Override recorded. Audit event logged.");
+    } catch (cause) {
+      const detail =
+        cause instanceof ApiError
+          ? typeof cause.detail === "string"
+            ? cause.detail
+            : JSON.stringify(cause.detail)
+          : (cause as Error).message;
+      setMessage(`Override refused: ${detail}`);
+    } finally {
+      setBusy(null);
+    }
+  }
 }

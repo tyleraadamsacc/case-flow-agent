@@ -37,7 +37,7 @@ def timeline_actions(client, legal_request_id: str) -> list[str]:
     ]
 
 
-def test_golden_1_gps_happy_path_end_to_end(client, advance_to_review):
+def test_golden_1_gps_happy_path_end_to_end(client, advance_to_review, finalize):
     runs = run_rail(client, advance_to_review, SCENARIO_A)
     assert list(runs) == list(RAIL_ORDER)
     assert all(run["status"] == "complete" for run in runs.values())
@@ -47,13 +47,16 @@ def test_golden_1_gps_happy_path_end_to_end(client, advance_to_review):
         f"/api/legal-requests/{SCENARIO_A}/review", json={"action": "approve"}
     )
     assert review.status_code == 200
-    approve = client.post(f"/api/legal-requests/{SCENARIO_A}/approve", json={})
+    # This search-warrant request is high sensitivity: dual control (two
+    # distinct approvers, a senior co-signer) plus attestations. The
+    # finalize helper attests and co-signs.
+    approve = finalize(SCENARIO_A)
     assert approve.status_code == 200
     assert approve.json()["finalized"] is True
     assert approve.json()["legal_request"]["workflow_state"] == "audit_complete"
 
     actions = timeline_actions(client, SCENARIO_A)
-    assert actions == [
+    assert actions[:10] == [
         "request_ingested",
         "request_extracted",
         "special_handling_checked",
@@ -64,9 +67,14 @@ def test_golden_1_gps_happy_path_end_to_end(client, advance_to_review):
         "production_package_drafted",
         "workflow_action_prepared",
         "analyst_reviewed",
-        "route_approved",
-        "audit_completed",
     ]
+    assert actions[-1] == "audit_completed"
+    assert set(actions[10:-1]) <= {"attestation_recorded", "route_approved"}
+    # Dual control records two approvals before finalization.
+    assert actions.count("route_approved") == 2
+    assert actions.count("attestation_recorded") == len(
+        approve.json()["legal_request"]["attestations"]
+    )
 
 
 def test_golden_2_missing_date_range_blocks_etl_and_approval(client, advance_to_review):
@@ -126,7 +134,7 @@ def test_golden_4_overbroad_request_held_for_sme_scope_review(client, advance_to
 
 
 def test_golden_5_simple_subscriber_request_routes_with_minimal_friction(
-    client, advance_to_review
+    client, advance_to_review, finalize
 ):
     runs = run_rail(client, advance_to_review, SCENARIO_E)
     assert all(run["status"] == "complete" for run in runs.values())
@@ -141,8 +149,10 @@ def test_golden_5_simple_subscriber_request_routes_with_minimal_friction(
     assert routing["requires_approval"] is True
 
     client.post(f"/api/legal-requests/{SCENARIO_E}/review", json={"action": "approve"})
-    approve = client.post(f"/api/legal-requests/{SCENARIO_E}/approve", json={})
+    # Low-sensitivity: a single approver finalizes, after attestations.
+    approve = finalize(SCENARIO_E)
     assert approve.json()["finalized"] is True
+    assert approve.json()["approvals_required"] == 1
 
 
 def test_golden_6_no_responsive_records_package_variant(client, advance_to_review):
@@ -201,11 +211,14 @@ def test_golden_9_sop_conflict_between_registry_and_routing_rules(
     assert "ROUTE-SUBSCRIBER" in classification["evidence_ids"]
 
 
-def test_golden_10_missing_audit_event_blocks_finalization(client, container):
+def test_golden_10_missing_audit_event_blocks_finalization(
+    client, container, attest_required
+):
     request = container.legal_request_repository.get(SCENARIO_E)
     request.workflow_state = WorkflowState.ANALYST_REVIEW_PENDING
     container.legal_request_repository.save(request)
 
+    attest_required(SCENARIO_E)
     response = client.post(f"/api/legal-requests/{SCENARIO_E}/approve", json={})
     assert response.status_code == 200
     body = response.json()

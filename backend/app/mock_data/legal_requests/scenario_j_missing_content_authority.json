@@ -1,0 +1,68 @@
+{
+  "legal_request_id": "LER-2026-004912",
+  "scenario": "J",
+  "source_type": "lers_request_template",
+  "date_received": "2026-06-09",
+  "raw_source_uri": "local://legal_requests/scenario_j_missing_content_authority.json",
+  "raw_source_text": "COURT ORDER - To: Google LLC, Google Legal Investigations Support (LERS). The requesting agency seeks Gmail message bodies and attachments for account user.synthetic.j@example.com for the period 2026-05-01 through 2026-05-07. The order cites only 18 U.S.C. §§3122 and 3123. SYNTHETIC DATA - NOT A REAL LEGAL DOCUMENT.",
+  "extracted_fields": {
+    "legal_process": {
+      "type": "court_order",
+      "court_order_included": true,
+      "ex_parte_order": false,
+      "pen_register": false,
+      "trap_and_trace": false,
+      "location_tracking": false,
+      "stored_communications": true
+    },
+    "requesting_agency": {
+      "agency": "Ramsey County Attorney Cyber Unit (Synthetic)",
+      "case_number": "MC-26-80612",
+      "officer": "Investigator Elena Soto",
+      "contact_email": "synthetic.cyberunit@example.gov",
+      "phone": "555-0112"
+    },
+    "subject_identifiers": [
+      {
+        "type": "gmail_account",
+        "value": "user.synthetic.j@example.com",
+        "confidence": 0.99,
+        "source_span": "account user.synthetic.j@example.com"
+      }
+    ],
+    "requested_data_categories": [
+      {
+        "category": "Email Contents and Attachments",
+        "product_domain": "Gmail",
+        "sensitivity": "high",
+        "content_type": "content",
+        "requires_sme_review": true
+      }
+    ],
+    "product_domains": ["Gmail"],
+    "requested_period": {
+      "start": "2026-05-01T00:00:00Z",
+      "end": "2026-05-07T23:59:59Z"
+    },
+    "special_handling": {
+      "sealed": false,
+      "non_disclosure_to_subscriber": false,
+      "no_adverse_action": false,
+      "pen_register_requested": false,
+      "trap_and_trace_requested": false,
+      "ongoing_access_requested": false,
+      "location_tracking_requested": false,
+      "content_requested": true,
+      "tombstone_requested": false,
+      "production_deadline_days": 35,
+      "service_deadline_days": 14
+    },
+    "legal_authorities": [
+      {
+        "citation": "18 U.S.C. §§3122 and 3123",
+        "description": "Pen register and trap and trace authorization only",
+        "source_span": "cites only 18 U.S.C. §§3122 and 3123"
+      }
+    ]
+  }
+}

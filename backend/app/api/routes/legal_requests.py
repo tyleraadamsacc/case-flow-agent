@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends
 from app.api.deps import Container, get_container
 from app.api.schemas import (
     ActionResponse,
+    CompletenessScoreResponse,
     ExtractResponse,
     LegalRequestCreate,
     ValidateResponse,
@@ -21,6 +22,7 @@ from app.errors import NotFoundError
 from app.models.enums import ActorType, AuditAction
 from app.models.legal_request import LegalRequest
 from app.models.workflow_state import WorkflowState
+from app.services.request_completeness_score_service import RequestCompletenessScoreService
 
 router = APIRouter(prefix="/api/legal-requests", tags=["legal-requests"])
 
@@ -79,6 +81,25 @@ def get_legal_request(
     return request
 
 
+@router.get("/{legal_request_id}/completeness-score")
+def get_completeness_score(
+    legal_request_id: str, container: Container = Depends(get_container)
+) -> CompletenessScoreResponse:
+    request = _load(container, legal_request_id)
+    request_for_score = request.model_copy(deep=True)
+    if request_for_score.production_package is not None:
+        findings = container.response_package_service.validate_package(
+            request_for_score.production_package
+        )
+        request_for_score.production_package.validation_findings = findings
+        request_for_score.package_validation_findings = findings
+    return CompletenessScoreResponse(
+        score=RequestCompletenessScoreService(container.approval_policy).score(
+            request_for_score
+        )
+    )
+
+
 @router.post("/{legal_request_id}/extract")
 def extract(
     legal_request_id: str, container: Container = Depends(get_container)
@@ -90,6 +111,7 @@ def extract(
 
     extraction = container.extraction_service.extract(request)
     container.extraction_service.apply(request, extraction)
+    request.scope_authority_checks = container.scope_authority_service.analyze(request)
     request.deficiency_findings = container.deficiency_service.evaluate(request)
     before = container.state_machine.transition(request, WorkflowState.REQUEST_EXTRACTED)
 
@@ -103,7 +125,8 @@ def extract(
         summary=(
             f"Extracted {len(request.subject_identifiers)} identifier(s), "
             f"{len(request.requested_data_categories)} data categor(ies), "
-            f"{len(request.legal_authorities)} authorit(ies); "
+            f"{len(request.legal_authorities)} authorit(ies), "
+            f"{len(request.source_sections)} source section(s); "
             f"{len(request.deficiency_findings)} preliminary deficienc(ies). "
             "Template placeholder text stripped."
         ),
@@ -125,6 +148,7 @@ def validate(
         request.workflow_state, WorkflowState.REQUEST_VALIDATED
     )
 
+    request.scope_authority_checks = container.scope_authority_service.analyze(request)
     request.deficiency_findings = container.deficiency_service.evaluate(request)
     special_handling = container.special_handling_service.check(request)
     policy = container.approval_policy.evaluate(request)

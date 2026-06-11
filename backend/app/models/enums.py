@@ -10,6 +10,20 @@ class ActorType(StrEnum):
     HUMAN = "human"
 
 
+class Role(StrEnum):
+    """Human reviewer roles (lightweight, synthetic — no real auth).
+
+    Carried on the request actor via the X-CaseFlow-Role header and used
+    to gate sensitive human actions: dual-control finalization of a
+    high-sensitivity request requires a senior_analyst co-signer.
+    """
+
+    ANALYST = "analyst"
+    SENIOR_ANALYST = "senior_analyst"
+    SME = "sme"
+    QA = "qa"
+
+
 class AuditAction(StrEnum):
     """Audit event taxonomy (plan §14). Agent-run actions are listed for
     completeness but are not emitted until PR 2."""
@@ -34,6 +48,11 @@ class AuditAction(StrEnum):
     SENT_TO_QA = "sent_to_qa"
     FINALIZATION_BLOCKED = "finalization_blocked"
     AUDIT_COMPLETED = "audit_completed"
+    HUMAN_OVERRIDE_APPLIED = "human_override_applied"
+    AGENT_RUN_RERUN_REQUESTED = "agent_run_rerun_requested"
+    AGENT_RUN_ACCEPTED = "agent_run_accepted"
+    AGENT_RUN_SENT_BACK = "agent_run_sent_back"
+    ATTESTATION_RECORDED = "attestation_recorded"
 
 
 class AgentRunStatus(StrEnum):
@@ -55,6 +74,7 @@ class LegalProcessType(StrEnum):
     COURT_ORDER = "court_order"
     PEN_REGISTER = "pen_register"
     TRAP_AND_TRACE = "trap_and_trace"
+    LOCATION_TRACKING = "location_tracking"
     LEGAL_PROCESS_REQUEST = "legal_process_request"
     UNKNOWN = "unknown"
 
@@ -84,6 +104,8 @@ class DeficiencyCode(StrEnum):
     MISSING_IDENTIFIER = "missing_identifier"
     OVERBROAD_SCOPE = "overbroad_scope"
     AMBIGUOUS_REQUEST_TYPE = "ambiguous_request_type"
+    UNRESOLVED_TEMPLATE_PLACEHOLDER = "unresolved_template_placeholder"
+    SCOPE_AUTHORITY_MISMATCH = "scope_authority_mismatch"
 
 
 class DeficiencySeverity(StrEnum):
@@ -104,6 +126,12 @@ class ReviewReason(StrEnum):
     CONTENT_REQUESTED = "content_requested"
     TOMBSTONE_REQUESTED = "tombstone_requested"
     OVERBROAD_SCOPE = "overbroad_scope"
+    TEMPLATE_PLACEHOLDER_UNRESOLVED = "template_placeholder_unresolved"
+    SCOPE_AUTHORITY_MISMATCH = "scope_authority_mismatch"
+    ONGOING_COLLECTION_REQUESTED = "ongoing_collection_requested"
+    RESPONSE_PACKAGE_VALIDATION_ISSUE = "response_package_validation_issue"
+    RECORD_COUNT_MISMATCH = "record_count_mismatch"
+    CERTIFICATION_INCOMPLETE = "certification_incomplete"
     MISSING_REQUIRED_IDENTIFIER = "missing_required_identifier"
     MISSING_OR_INVALID_DATE_RANGE = "missing_or_invalid_date_range"
     LOW_CLASSIFICATION_CONFIDENCE = "low_classification_confidence"
@@ -130,6 +158,41 @@ class ReviewAction(StrEnum):
     REQUEST_CHANGES = "request_changes"
     ESCALATE = "escalate"
     SEND_TO_QA = "send_to_qa"
+
+
+class OverrideTarget(StrEnum):
+    """The agent-produced fields a human may correct in place. Bounded by
+    design: each target has an explicit, audited apply handler. Correcting
+    an extraction field re-runs deficiency detection, so a human fix can
+    clear a blocking deficiency."""
+
+    REQUESTED_PERIOD = "requested_period"
+    LEGAL_PROCESS_TYPE = "legal_process_type"
+    RECOMMENDED_QUEUE = "recommended_queue"
+    PRODUCTION_SUMMARY_TEXT = "production_summary_text"
+    CERTIFICATION_REPRESENTATIVE = "certification_representative"
+
+
+class AgentRunDecision(StrEnum):
+    """A human's verdict on one persisted agent run (theme C)."""
+
+    ACCEPTED = "accepted"
+    SENT_BACK = "sent_back"
+
+
+class AttestationItem(StrEnum):
+    """Pre-finalization checks a human must personally confirm. The
+    required subset is computed from the approval policy per request."""
+
+    SCOPE_VERIFIED = "scope_verified"
+    IDENTIFIERS_MATCH = "identifiers_match"
+    NONDISCLOSURE_REVIEWED = "nondisclosure_reviewed"
+    SEALED_HANDLING_ACKNOWLEDGED = "sealed_handling_acknowledged"
+    CONTENT_SCOPE_CONFIRMED = "content_scope_confirmed"
+    AUTHORITY_SCOPE_MATCH_CONFIRMED = "authority_scope_match_confirmed"
+    ONGOING_COLLECTION_REVIEWED = "ongoing_collection_reviewed"
+    PACKAGE_COMPLETENESS_CONFIRMED = "package_completeness_confirmed"
+    CERTIFICATION_REVIEWED = "certification_reviewed"
 
 
 class ApprovalDecisionType(StrEnum):

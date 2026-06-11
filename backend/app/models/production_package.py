@@ -4,6 +4,7 @@ from app.models.base import CaseFlowModel
 from app.models.certification import Certification
 from app.models.chain_of_custody import ChainOfCustody
 from app.models.enums import ProductionPackageStatus
+from app.models.lers_quality import PackageValidationFinding
 from app.models.requesting_agency import RequestingAgency
 from app.models.responsive_record import ResponsiveRecord
 from app.models.subject_identifier import SubjectIdentifier
@@ -39,6 +40,7 @@ class ProductionPackage(CaseFlowModel):
     field_definitions: list[DataFieldDefinition] = []
     chain_of_custody: ChainOfCustody = ChainOfCustody()
     certification: Certification = Certification()
+    validation_findings: list[PackageValidationFinding] = []
     status: ProductionPackageStatus = ProductionPackageStatus.DRAFT_PENDING_ANALYST_REVIEW
     risk_flags: list[str] = []
     section_provenance: dict[str, str] = {}

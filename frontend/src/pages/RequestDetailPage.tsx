@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { api, ApiError } from "../api/client";
-import type { AuditEvent, LegalRequest } from "../api/types";
+import type { AuditEvent, FinalizationStatus, LegalRequest } from "../api/types";
 import SixAgentWorkflowRail from "../components/agents/SixAgentWorkflowRail";
 import ConsoleShell from "../components/layout/ConsoleShell";
 import ResponsePackageView from "../components/package/ResponsePackageView";
@@ -10,6 +10,7 @@ import TextDraftView from "../components/package/TextDraftView";
 import ExtractedFieldsPanel from "../components/request/ExtractedFieldsPanel";
 import ReviewPanel from "../components/request/ReviewPanel";
 import SourceDocumentPanel from "../components/request/SourceDocumentPanel";
+import type { SourceTraceTarget } from "../components/request/SourceDocumentPanel";
 import WorkflowProgress from "../components/request/WorkflowProgress";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
@@ -32,17 +33,23 @@ export default function RequestDetailPage() {
   const { id = "" } = useParams();
   const [request, setRequest] = useState<LegalRequest | null>(null);
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
+  const [finalizationStatus, setFinalizationStatus] =
+    useState<FinalizationStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [activeTraceTarget, setActiveTraceTarget] =
+    useState<SourceTraceTarget | null>(null);
 
   const refresh = useCallback(async () => {
-    const [detail, events] = await Promise.all([
+    const [detail, events, status] = await Promise.all([
       api.getLegalRequest(id),
       api.auditTimeline(id),
+      api.finalizationStatus(id).catch(() => null),
     ]);
     setRequest(detail);
     setAuditEvents(events);
+    setFinalizationStatus(status);
   }, [id]);
 
   useEffect(() => {
@@ -76,6 +83,14 @@ export default function RequestDetailPage() {
     } finally {
       setBusy(null);
     }
+  }
+
+  function handleUpdated(updated: LegalRequest) {
+    setRequest(updated);
+    api.auditTimeline(id).then(setAuditEvents).catch(() => undefined);
+    api.finalizationStatus(id)
+      .then(setFinalizationStatus)
+      .catch(() => setFinalizationStatus(null));
   }
 
   if (loadError) {
@@ -114,6 +129,31 @@ export default function RequestDetailPage() {
   const blockedDeficiency = request.deficiency_findings.some(
     (finding) => finding.severity === "blocking",
   );
+  const sourceSections = request.source_sections ?? [];
+
+  function resolveTraceTarget(
+    sourceSpan: string | null | undefined,
+    fallbackTerms: string[] = [],
+  ): SourceTraceTarget | null {
+    if (sourceSections.length === 0) {
+      return null;
+    }
+
+    const sourceSpanTarget = sourceSpan
+      ? sectionTargetForTerm(sourceSections, sourceSpan, sourceSpan)
+      : null;
+    if (sourceSpanTarget) {
+      return sourceSpanTarget;
+    }
+
+    for (const term of fallbackTerms.filter(Boolean)) {
+      const target = sectionTargetForTerm(sourceSections, term, sourceSpan ?? null);
+      if (target) {
+        return target;
+      }
+    }
+    return null;
+  }
 
   return (
     <ConsoleShell
@@ -122,10 +162,7 @@ export default function RequestDetailPage() {
         <ReviewPanel
           request={request}
           auditEvents={auditEvents}
-          onUpdated={(updated) => {
-            setRequest(updated);
-            api.auditTimeline(id).then(setAuditEvents).catch(() => undefined);
-          }}
+          onUpdated={handleUpdated}
         />
       }
     >
@@ -207,8 +244,16 @@ export default function RequestDetailPage() {
       </header>
 
       <div className="cf-detail-grid">
-        <SourceDocumentPanel request={request} />
-        <ExtractedFieldsPanel request={request} />
+        <SourceDocumentPanel
+          request={request}
+          activeTraceTarget={activeTraceTarget}
+        />
+        <ExtractedFieldsPanel
+          request={request}
+          onUpdated={handleUpdated}
+          onTraceTarget={setActiveTraceTarget}
+          resolveTraceTarget={resolveTraceTarget}
+        />
       </div>
 
       <section className="cf-detail-section">
@@ -218,7 +263,33 @@ export default function RequestDetailPage() {
             ? "Latest persisted run per agent; every run carries its audit event."
             : "Agents have not run yet. Each agent will appear here with status, output, evidence, and its audit event."}
         </p>
-        <SixAgentWorkflowRail runs={toRailRuns(request.agent_runs, auditActions)} />
+        <SixAgentWorkflowRail
+          request={request}
+          auditEvents={auditEvents}
+          finalizationStatus={finalizationStatus}
+          runs={toRailRuns(
+            request.agent_runs,
+            auditActions,
+            request.agent_run_reviews,
+          )}
+          onOpenSourceTrace={(sourceSpan, fallbackTerms = []) =>
+            setActiveTraceTarget(resolveTraceTarget(sourceSpan, fallbackTerms))
+          }
+          onAcceptAgent={(agentId) =>
+            run("Agent acceptance", () =>
+              api.acceptAgentRun(
+                id,
+                agentId,
+                "Accepted from the Six-Agent Workflow Rail.",
+              ),
+            )
+          }
+          onRerunAgent={(agentId, instruction) =>
+            run("Agent redraft", () =>
+              api.rerunAgent(id, agentId, instruction || undefined),
+            )
+          }
+        />
       </section>
 
       <section className="cf-detail-section">
@@ -259,7 +330,10 @@ export default function RequestDetailPage() {
         </div>
 
         {request.production_package ? (
-          <ResponsePackageView pkg={request.production_package} />
+          <ResponsePackageView
+            pkg={request.production_package}
+            onUpdated={handleUpdated}
+          />
         ) : null}
 
         {request.text_drafts
@@ -297,4 +371,31 @@ export default function RequestDetailPage() {
       </section>
     </ConsoleShell>
   );
+}
+
+function sectionTargetForTerm(
+  sections: LegalRequest["source_sections"],
+  term: string,
+  sourceSpan: string | null,
+): SourceTraceTarget | null {
+  const normalizedTerm = normalizeTraceText(term);
+  if (!normalizedTerm) {
+    return null;
+  }
+
+  for (const section of sections) {
+    const normalizedText = normalizeTraceText(`${section.title} ${section.text}`);
+    if (normalizedText.includes(normalizedTerm)) {
+      return {
+        section_id: section.section_id,
+        source_span: sourceSpan,
+        label: section.title,
+      };
+    }
+  }
+  return null;
+}
+
+function normalizeTraceText(value: string): string {
+  return value.toLowerCase().replace(/\s+/g, " ").trim();
 }

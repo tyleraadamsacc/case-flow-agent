@@ -35,12 +35,23 @@ from app.models.human_review import HumanReview
 from app.models.legal_authority import LegalAuthority
 from app.models.legal_process import LegalProcess
 from app.models.legal_request import LegalRequest
+from app.models.lers_quality import (
+    PackageValidationFinding,
+    ScopeAuthorityCheck,
+    SourceDocumentSection,
+)
 from app.models.note_draft import NoteDraft
 from app.models.product_domain import ProductDomain
 from app.models.production_package import DataFieldDefinition, ProductionPackage
 from app.models.requested_data_category import RequestedDataCategory
 from app.models.requested_period import RequestedPeriod
 from app.models.requesting_agency import RequestingAgency
+from app.models.request_completeness_score import (
+    CompletenessComponent,
+    CompletenessComponentScore,
+    CompletenessStatus,
+    RequestCompletenessScore,
+)
 from app.models.responsive_record import ResponsiveRecord
 from app.models.routing_recommendation import RoutingRecommendation
 from app.models.special_handling import SpecialHandlingFlags
@@ -58,6 +69,9 @@ __all__ = [
     "Certification",
     "ChainOfCustody",
     "ClassificationResult",
+    "CompletenessComponent",
+    "CompletenessComponentScore",
+    "CompletenessStatus",
     "DataConfidence",
     "DataFieldDefinition",
     "DeficiencyCode",
@@ -73,6 +87,7 @@ __all__ = [
     "LegalProcess",
     "LegalProcessType",
     "LegalRequest",
+    "PackageValidationFinding",
     "NoteDraft",
     "NoteType",
     "ProductDomain",
@@ -80,6 +95,7 @@ __all__ = [
     "ProductionPackageStatus",
     "RequestedDataCategory",
     "RequestedPeriod",
+    "RequestCompletenessScore",
     "RequestingAgency",
     "ResponsiveRecord",
     "ReviewAction",
@@ -87,7 +103,9 @@ __all__ = [
     "ReviewTargetType",
     "RoutingRecommendation",
     "Sensitivity",
+    "ScopeAuthorityCheck",
     "SpecialHandlingFlags",
+    "SourceDocumentSection",
     "SubjectIdentifier",
     "TextDraft",
     "WorkflowState",

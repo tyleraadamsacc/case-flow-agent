@@ -32,9 +32,9 @@
     },
     {
       "flag": "ongoing_access_requested",
-      "review_reason": "pen_register_requested",
+      "review_reason": "ongoing_collection_requested",
       "evidence_id": "SH-ONGOING-ACCESS",
-      "description": "Ongoing access cadence is handled under the pen register review path."
+      "description": "Ongoing collection duration and update cadence require explicit analyst review."
     },
     {
       "flag": "location_tracking_requested",

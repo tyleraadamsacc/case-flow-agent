@@ -9,7 +9,9 @@ def timeline_actions(client, legal_request_id: str) -> list[str]:
     ]
 
 
-def test_full_happy_path_finalizes_with_complete_audit_trail(client, advance_to_review):
+def test_full_happy_path_finalizes_with_complete_audit_trail(
+    client, advance_to_review, attest_required
+):
     advance_to_review("LER-2026-004850")
 
     review = client.post(
@@ -19,6 +21,8 @@ def test_full_happy_path_finalizes_with_complete_audit_trail(client, advance_to_
     assert review.status_code == 200
     assert review.json()["audit_event"]["action"] == "analyst_reviewed"
 
+    # Pre-finalization attestations (theme E) precede approval.
+    required_attestations = attest_required("LER-2026-004850")
     approve = client.post("/api/legal-requests/LER-2026-004850/approve", json={})
     assert approve.status_code == 200
     body = approve.json()
@@ -26,14 +30,20 @@ def test_full_happy_path_finalizes_with_complete_audit_trail(client, advance_to_
     assert body["legal_request"]["workflow_state"] == "audit_complete"
     assert body["approval_decision"]["decided_by"] == "analyst.local"
     assert body["approval_decision"]["decision"] == "approved"
-    assert timeline_actions(client, "LER-2026-004850") == [
+    # This low-sensitivity request needs a single approver and no senior co-sign.
+    assert body["approvals_required"] == 1
+    assert body["awaiting_approval"] is False
+    actions = timeline_actions(client, "LER-2026-004850")
+    assert actions[:4] == [
         "request_ingested",
         "request_extracted",
         "special_handling_checked",
         "analyst_reviewed",
-        "route_approved",
-        "audit_completed",
     ]
+    assert actions[-2:] == ["route_approved", "audit_completed"]
+    # The request-specific attestations recorded between review and approval.
+    assert set(actions[4:-2]) == {"attestation_recorded"}
+    assert len(actions[4:-2]) == len(required_attestations)
 
 
 def test_blocking_deficiency_prevents_approval(client, advance_to_review):
@@ -71,6 +81,34 @@ def test_send_to_qa_is_internal_only_and_audited(client, advance_to_review):
     assert "Internal QA handoff only" in body["audit_event"]["summary"]
 
 
+def test_finalization_status_requires_package_and_certification_attestations(
+    client, advance_to_review
+):
+    legal_request_id = "LER-2026-004812"
+    advance_to_review(legal_request_id)
+    rail = client.post(f"/api/legal-requests/{legal_request_id}/agents/run")
+    assert rail.status_code == 200
+    draft = client.post(
+        f"/api/legal-requests/{legal_request_id}/production-package/draft"
+    )
+    assert draft.status_code == 200, draft.text
+    assert draft.json()["production_package"] is not None
+
+    status = client.get(
+        f"/api/legal-requests/{legal_request_id}/finalization-status"
+    ).json()
+
+    assert {
+        "package_completeness_confirmed",
+        "certification_reviewed",
+    } <= set(status["required_attestations"])
+    assert {
+        "package_completeness_confirmed",
+        "certification_reviewed",
+    } <= set(status["missing_attestations"])
+    assert status["ready_for_approval"] is False
+
+
 def test_request_changes_moves_state(client, advance_to_review):
     advance_to_review("LER-2026-004842")
     response = client.post(
@@ -86,13 +124,14 @@ def test_approve_from_intake_is_invalid_transition(client):
     assert response.status_code == 409
 
 
-def test_missing_audit_events_block_finalization(client, container):
+def test_missing_audit_events_block_finalization(client, container, attest_required):
     """A request staged into review without the required upstream audit
-    events must not reach audit_complete."""
+    events must not reach audit_complete — even once attestations pass."""
     request = container.legal_request_repository.get("LER-2026-004850")
     request.workflow_state = WorkflowState.ANALYST_REVIEW_PENDING
     container.legal_request_repository.save(request)
 
+    attest_required("LER-2026-004850")
     response = client.post("/api/legal-requests/LER-2026-004850/approve", json={})
     assert response.status_code == 200
     body = response.json()

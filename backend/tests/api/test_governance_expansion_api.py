@@ -104,10 +104,12 @@ def test_processing_time_and_bottlenecks_are_estimated(client, advance_to_review
     assert all(m["data_confidence"] == "estimated" for m in bottlenecks)
 
 
-def test_audit_readiness_reports_missing_events_and_blocks(client, advance_to_review):
+def test_audit_readiness_reports_missing_events_and_blocks(
+    client, advance_to_review, finalize
+):
     advance_to_review("LER-2026-004850")
     report = client.get("/api/governance/audit-readiness").json()
-    assert report["requests_total"] == 8
+    assert report["requests_total"] == 14
     # No request is approved yet, so route_approved is missing everywhere.
     assert report["requests_with_all_required_events"] == 0
     assert "route_approved" in report["missing_events_by_request"]["LER-2026-004850"]
@@ -116,7 +118,7 @@ def test_audit_readiness_reports_missing_events_and_blocks(client, advance_to_re
     client.post(
         "/api/legal-requests/LER-2026-004850/review", json={"action": "approve"}
     )
-    client.post("/api/legal-requests/LER-2026-004850/approve", json={})
+    finalize("LER-2026-004850")
     report = client.get("/api/governance/audit-readiness").json()
     assert report["requests_with_all_required_events"] == 1
     assert "LER-2026-004850" not in report["missing_events_by_request"]
@@ -127,7 +129,7 @@ def test_response_package_status_counts(client, advance_to_review):
         m["metric_id"]: m["value"]
         for m in client.get("/api/governance/response-package-status").json()["metrics"]
     }
-    assert before["response_package:none"] == 8
+    assert before["response_package:none"] == 14
 
     run_rail(client, advance_to_review, "LER-2026-004812")
     after = {
@@ -135,7 +137,7 @@ def test_response_package_status_counts(client, advance_to_review):
         for m in client.get("/api/governance/response-package-status").json()["metrics"]
     }
     assert after["response_package:draft_pending_analyst_review"] == 1
-    assert after["response_package:none"] == 7
+    assert after["response_package:none"] == 13
 
 
 def test_audit_events_filter_by_agent_id_and_official_name(client, advance_to_review):

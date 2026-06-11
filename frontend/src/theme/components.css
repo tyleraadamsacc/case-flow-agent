@@ -6,6 +6,7 @@
 .cf-button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
@@ -14,7 +15,9 @@
   font-weight: 500;
   line-height: 1;
   padding: 10px 20px;
+  max-width: 100%;
   cursor: pointer;
+  text-align: center;
   transition: background var(--motion-fast), box-shadow var(--motion-fast),
     transform var(--motion-fast);
 }
@@ -92,6 +95,7 @@
 /* ---------- Card ---------- */
 
 .cf-card {
+  min-width: 0;
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
@@ -377,34 +381,42 @@ button.cf-chip {
 
 .cf-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100dvh;
   background: var(--background-app);
+  overflow: hidden;
 }
 
 .cf-shell__main {
-  flex: 1;
+  flex: 1 1 0;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .cf-shell__body {
   display: flex;
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .cf-shell__content {
   flex: 1;
   min-width: 0;
+  width: 100%;
   padding: var(--space-6) var(--space-8);
-  max-width: 1400px;
+  max-width: min(1400px, 100%);
 }
 
 .cf-shell__context {
   width: 320px;
   flex: none;
   padding: var(--space-6) var(--space-6) var(--space-6) 0;
+  min-height: 0;
 }
 
 @media (max-width: 1100px) {
@@ -428,6 +440,7 @@ button.cf-chip {
   display: flex;
   align-items: center;
   gap: var(--space-4);
+  min-height: 64px;
   padding: var(--space-3) var(--space-6);
   background: var(--surface-card);
   border-bottom: 1px solid var(--border-subtle);
@@ -491,23 +504,97 @@ button.cf-chip {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
+}
+
+.cf-topbar__actor {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-small);
+  white-space: nowrap;
+}
+
+.cf-topbar__actor-select {
+  width: 220px;
+  max-width: 28vw;
+  padding: 7px 10px;
+  font-size: var(--font-small);
+}
+
+@media (max-width: 780px) {
+  .cf-topbar {
+    flex-wrap: wrap;
+    align-content: center;
+    gap: var(--space-2);
+    padding-inline: var(--space-4);
+  }
+
+  .cf-topbar__divider,
+  .cf-topbar__title {
+    display: none;
+  }
+
+  .cf-topbar__actor > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .cf-topbar__actor-select {
+    width: 160px;
+    max-width: 36vw;
+  }
+}
+
+@media (max-width: 520px) {
+  .cf-topbar__spacer {
+    display: none;
+  }
+
+  .cf-topbar__actions {
+    flex: 1 1 100%;
+    overflow: hidden;
+  }
+
+  .cf-topbar__role-chip {
+    display: none;
+  }
+
+  .cf-topbar__actor-select {
+    width: 150px;
+    max-width: 100%;
+  }
 }
 
 /* ---------- Side nav ---------- */
 
 .cf-sidenav {
-  width: 232px;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  width: 248px;
+  height: 100dvh;
   flex: none;
   display: flex;
   flex-direction: column;
-  padding: var(--space-4) var(--space-3);
+  padding: var(--space-4) var(--space-3) var(--space-3);
   background: var(--surface-card);
   border-right: 1px solid var(--border-subtle);
-  transition: width var(--motion-standard);
+  overflow: hidden auto;
+  transition:
+    width 180ms ease-out,
+    padding 180ms ease-out;
 }
 
 .cf-sidenav--collapsed {
-  width: 68px;
+  width: 72px;
+  padding-inline: var(--space-2);
 }
 
 .cf-sidenav__list {
@@ -529,16 +616,21 @@ button.cf-chip {
   font-family: inherit;
   font-size: var(--font-body);
   color: var(--text-secondary);
+  min-height: 44px;
   padding: 10px 14px;
-  border-radius: var(--radius-pill);
+  border-radius: 14px;
   cursor: pointer;
   text-align: left;
   white-space: nowrap;
-  transition: background var(--motion-fast);
+  transition:
+    background var(--motion-fast),
+    color var(--motion-fast),
+    transform var(--motion-fast);
 }
 
 .cf-sidenav__item:hover {
   background: var(--surface-soft);
+  color: var(--text-primary);
 }
 
 .cf-sidenav__item[aria-current="page"] {
@@ -550,20 +642,42 @@ button.cf-chip {
 .cf-sidenav__icon {
   flex: none;
   display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
 }
 
 .cf-sidenav--collapsed .cf-sidenav__label {
   display: none;
 }
 
+.cf-sidenav--collapsed .cf-sidenav__item {
+  justify-content: center;
+  gap: 0;
+  padding-inline: 0;
+  border-radius: 16px;
+}
+
 /* Auto-collapse to icon rail on narrow screens. */
 @media (max-width: 900px) {
+  .cf-shell__main {
+    max-width: calc(100vw - 72px);
+  }
+
   .cf-sidenav {
-    width: 68px;
+    width: 72px;
+    padding-inline: var(--space-2);
   }
 
   .cf-sidenav__label {
     display: none;
+  }
+
+  .cf-sidenav__item {
+    justify-content: center;
+    gap: 0;
+    padding-inline: 0;
   }
 }
 
@@ -577,12 +691,54 @@ button.cf-chip {
 .cf-synthetic-banner {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
   padding: 6px var(--space-6);
   background: var(--violet-soft);
   color: #5b2bd9;
   font-size: var(--font-small);
   border-bottom: 1px solid var(--border-subtle);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 520px) {
+  .cf-synthetic-banner {
+    padding-left: var(--space-3);
+    padding-right: var(--space-6);
+  }
+}
+
+@media (max-width: 560px) {
+  .cf-shell__main {
+    max-width: calc(100vw - 56px);
+  }
+
+  .cf-sidenav {
+    width: 56px;
+    padding-inline: var(--space-1);
+  }
+
+  .cf-shell__content {
+    padding: var(--space-3);
+  }
+
+  .cf-hero,
+  .cf-card {
+    padding: var(--space-4);
+  }
+
+  .cf-button {
+    white-space: normal;
+  }
+
+  .cf-chip {
+    max-width: 100%;
+  }
+
+  .cf-topbar {
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+  }
 }
 
 /* ---------- Agent run card ---------- */
@@ -794,6 +950,27 @@ button.cf-chip {
   color: var(--text-muted);
 }
 
+.cf-agent-card__actions {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cf-agent-card__instruction {
+  max-width: none;
+  resize: vertical;
+  min-height: 64px;
+  font-size: var(--font-small);
+}
+
+.cf-agent-card__action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 /* ---------- Six-Agent Workflow Rail ---------- */
 
 /* Columns follow the rail's own width, not the viewport — the rail sits
@@ -918,10 +1095,23 @@ button.cf-chip {
   margin-bottom: var(--space-1);
 }
 
+@media (max-width: 520px) {
+  .cf-page-header > h1 {
+    font-size: 28px;
+    line-height: 1.15;
+  }
+}
+
 .cf-page-header > p {
   color: var(--text-secondary);
   margin: 0;
   max-width: 640px;
+}
+
+@media (max-width: 520px) {
+  .cf-page-header > p {
+    max-width: 250px;
+  }
 }
 
 .cf-toolbar {
@@ -951,6 +1141,19 @@ button.cf-chip {
 
 .cf-input::placeholder {
   color: var(--text-muted);
+}
+
+.cf-inline-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.cf-inline-edit > .cf-input {
+  flex: 1 1 150px;
+  min-width: 0;
 }
 
 /* ---------- Request queue ---------- */
@@ -1047,11 +1250,14 @@ button.cf-chip {
 .cf-detail-header__title {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-3);
+  min-width: 0;
 }
 
 .cf-detail-header__title > h1 {
   font-size: var(--font-display);
+  overflow-wrap: anywhere;
 }
 
 .cf-detail-header__meta {
@@ -1119,11 +1325,35 @@ button.cf-chip {
   overflow-wrap: anywhere;
 }
 
+.cf-source-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  margin-bottom: var(--space-2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: var(--space-1);
+  scrollbar-width: thin;
+}
+
+.cf-source-nav > .cf-chip {
+  flex: 0 0 auto;
+}
+
 .cf-doc__mark {
   background: var(--blue-soft);
   color: #185abc;
   border-radius: 3px;
   padding: 0 2px;
+}
+
+.cf-doc__section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
 }
 
 /* ---------- Extracted fields ---------- */
@@ -1189,8 +1419,61 @@ button.cf-chip {
   margin: 0 0 var(--space-3);
 }
 
+.cf-review__recommendation > p {
+  margin: 0 0 var(--space-2);
+}
+
+.cf-review__inline-action {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.cf-review__inline-action > .cf-input {
+  min-width: 0;
+  max-width: none;
+}
+
 .cf-review__reasons {
   margin-bottom: var(--space-3);
+}
+
+.cf-review__finalization {
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: var(--space-3) 0;
+  margin: var(--space-3) 0;
+}
+
+.cf-review__approval-state,
+.cf-review__checklist,
+.cf-review__check {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.cf-review__approval-state,
+.cf-review__checklist {
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
+.cf-review__check {
+  align-items: center;
+  min-width: 0;
+}
+
+.cf-review__check > .cf-chip {
+  min-width: 0;
+  white-space: normal;
+}
+
+.cf-review__blockers {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-4);
+  color: var(--red);
+  font-size: var(--font-small);
 }
 
 .cf-review__comments {
@@ -1355,6 +1638,12 @@ button.cf-chip {
   margin-bottom: var(--space-6);
 }
 
+@media (max-width: 520px) {
+  .cf-metric-strip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .cf-metric__value {
   display: block;
   font-size: var(--font-display);
@@ -1434,6 +1723,12 @@ button.cf-chip {
   }
 }
 
+@media (max-width: 520px) {
+  .cf-coverage__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .cf-barlist {
   margin: 0;
   padding: 0;
@@ -1478,6 +1773,13 @@ button.cf-chip {
   font-size: var(--font-small);
   color: var(--text-secondary);
   white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .cf-barlist__item {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
 }
 
 /* ---------- Attention feed ---------- */
@@ -1737,6 +2039,7 @@ select.cf-input {
    plain surface. */
 .cf-hero {
   position: relative;
+  min-width: 0;
   overflow: hidden;
   background: var(--surface-card);
   border: 1px solid var(--border-subtle);

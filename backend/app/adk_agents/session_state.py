@@ -21,6 +21,7 @@ RECORDS_REF = "caseflow:records_ref"
 AS_OF_DATE = "caseflow:as_of_date"
 REQUESTED_DRAFT_TYPE = "caseflow:requested_draft_type"
 REQUESTED_NOTE_TYPE = "caseflow:requested_note_type"
+HUMAN_INSTRUCTIONS = "caseflow:human_instructions"
 
 
 def run_key(agent_id: str) -> str:
@@ -35,6 +36,17 @@ def get_legal_request(state: dict[str, Any]) -> LegalRequest | None:
 def get_run_draft(state: dict[str, Any], agent_id: str) -> AgentRunDraft | None:
     payload = state.get(run_key(agent_id))
     return AgentRunDraft.model_validate(payload) if payload else None
+
+
+def get_human_instruction(state: dict[str, Any], agent_id: str) -> str | None:
+    payload = state.get(HUMAN_INSTRUCTIONS)
+    if not isinstance(payload, dict):
+        return None
+    value = payload.get(agent_id)
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped or None
 
 
 def get_classification(state: dict[str, Any]) -> ClassificationResult | None:

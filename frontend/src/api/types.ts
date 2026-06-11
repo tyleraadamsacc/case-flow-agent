@@ -65,8 +65,20 @@ export interface RequestingAgency {
   address: string | null;
 }
 
+export type LegalProcessType =
+  | "search_warrant"
+  | "ex_parte_order"
+  | "subpoena"
+  | "court_order"
+  | "pen_register"
+  | "trap_and_trace"
+  | "legal_process_request"
+  | "unknown"
+  | (string & {});
+
 export interface LegalProcess {
-  type: string;
+  type: LegalProcessType;
+  components: LegalProcessType[];
   court_order_included: boolean;
   ex_parte_order: boolean;
   pen_register: boolean;
@@ -110,12 +122,42 @@ export interface SpecialHandlingFlags {
   production_deadline_days: number | null;
   service_deadline_days: number | null;
   nondisclosure_period: string | null;
+  ongoing_duration_days?: number | null;
+  ongoing_update_interval_minutes?: number | null;
 }
 
 export interface LegalAuthority {
   citation: string;
   description: string | null;
   source_span: string | null;
+}
+
+export interface SourceDocumentSection {
+  section_id: string;
+  title: string;
+  start_line: number;
+  end_line: number;
+  text: string;
+}
+
+export type ScopeAuthorityStatus =
+  | "covered"
+  | "needs_review"
+  | "missing_authority";
+
+export interface ScopeAuthorityCheck {
+  category: string;
+  status: ScopeAuthorityStatus;
+  required_citations: string[];
+  matched_citations: string[];
+  message: string;
+}
+
+export interface PackageValidationFinding {
+  code: string;
+  severity: "blocking" | "warning";
+  section: string;
+  message: string;
 }
 
 export interface DeficiencyFinding {
@@ -232,6 +274,7 @@ export interface ProductionPackage {
   status: ProductionPackageStatus;
   risk_flags: string[];
   section_provenance: Record<string, string>;
+  validation_findings: PackageValidationFinding[];
 }
 
 export interface HumanReview {
@@ -252,8 +295,67 @@ export interface ApprovalDecision {
   target_type: string;
   decision: string;
   decided_by: string;
+  role: string;
   policy_reasons: string[];
   comments: string | null;
+  timestamp: string;
+  audit_event_id: string | null;
+}
+
+/** Human-in-the-lead records (all synthetic, all audited). */
+
+export type OverrideTarget =
+  | "requested_period"
+  | "legal_process_type"
+  | "recommended_queue"
+  | "production_summary_text"
+  | "certification_representative";
+
+export interface HumanOverride {
+  override_id: string;
+  legal_request_id: string;
+  target: OverrideTarget;
+  field_path: string;
+  before_value: string;
+  after_value: string;
+  reason: string;
+  overridden_by: string;
+  role: string;
+  cleared_deficiencies: string[];
+  timestamp: string;
+  audit_event_id: string | null;
+}
+
+export type AgentRunDecision = "accepted" | "sent_back";
+
+export interface AgentRunReview {
+  review_id: string;
+  legal_request_id: string;
+  agent_id: string;
+  agent_run_id: string | null;
+  decision: AgentRunDecision;
+  instruction: string | null;
+  reviewed_by: string;
+  role: string;
+  timestamp: string;
+  audit_event_id: string | null;
+}
+
+export type AttestationItem =
+  | "scope_verified"
+  | "identifiers_match"
+  | "nondisclosure_reviewed"
+  | "sealed_handling_acknowledged"
+  | "content_scope_confirmed"
+  | "authority_scope_match_confirmed"
+  | "ongoing_collection_reviewed"
+  | "package_completeness_confirmed"
+  | "certification_reviewed";
+
+export interface Attestation {
+  item: AttestationItem;
+  attested_by: string;
+  role: string;
   timestamp: string;
   audit_event_id: string | null;
 }
@@ -279,6 +381,7 @@ export interface LegalRequest {
   source_type: string;
   date_received: string | null;
   workflow_state: WorkflowState;
+  source_sections: SourceDocumentSection[];
   requesting_agency: RequestingAgency | null;
   legal_process: LegalProcess | null;
   subject_identifiers: SubjectIdentifier[];
@@ -287,9 +390,14 @@ export interface LegalRequest {
   requested_period: RequestedPeriod | null;
   special_handling: SpecialHandlingFlags;
   legal_authorities: LegalAuthority[];
+  scope_authority_checks: ScopeAuthorityCheck[];
   deficiency_findings: DeficiencyFinding[];
+  package_validation_findings: PackageValidationFinding[];
   reviews: HumanReview[];
   approvals: ApprovalDecision[];
+  human_overrides: HumanOverride[];
+  agent_run_reviews: AgentRunReview[];
+  attestations: Attestation[];
   agent_runs: Record<string, AgentRun>;
   classification: ClassificationResult | null;
   routing_recommendation: RoutingRecommendation | null;
@@ -369,12 +477,65 @@ export interface ApproveResponse {
   approval_decision: ApprovalDecision;
   finalized: boolean;
   audit_events: AuditEvent[];
+  approvals_recorded: number;
+  approvals_required: number;
+  awaiting_approval: boolean;
 }
 
 export interface ActionResponse {
   legal_request: LegalRequest;
   audit_event: AuditEvent;
 }
+
+export interface OverrideBody {
+  target: OverrideTarget;
+  reason: string;
+  text_value?: string;
+  period_start?: string;
+  period_end?: string;
+}
+
+export interface AttestBody {
+  item: AttestationItem;
+}
+
+export interface OverrideResponse {
+  legal_request: LegalRequest;
+  override: HumanOverride;
+  audit_event: AuditEvent;
+}
+
+export interface AgentRunReviewResponse {
+  legal_request: LegalRequest;
+  agent_run: AgentRun | null;
+  agent_run_review: AgentRunReview;
+  audit_event: AuditEvent;
+}
+
+export interface AttestResponse {
+  legal_request: LegalRequest;
+  attestation: Attestation;
+  audit_event: AuditEvent;
+  required_attestations: AttestationItem[];
+  satisfied: boolean;
+}
+
+export interface FinalizationStatus {
+  workflow_state: WorkflowState;
+  required_attestations: AttestationItem[];
+  attested: AttestationItem[];
+  missing_attestations: AttestationItem[];
+  approvals_recorded: number;
+  approvals_required: number;
+  requires_senior_approval: boolean;
+  senior_approval_present: boolean;
+  blocked_agent_runs: string[];
+  blocking_reasons: string[];
+  ready_for_approval: boolean;
+}
+
+/** Lightweight synthetic reviewer roles (X-CaseFlow-Role header). */
+export type Role = "analyst" | "senior_analyst" | "sme" | "qa";
 
 export type DataConfidence =
   | "fully_tracked"

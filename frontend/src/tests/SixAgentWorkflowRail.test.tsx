@@ -1,8 +1,8 @@
 /** The Six-Agent Workflow Rail is the product's hard requirement: all six
  * RFP agents, by exact official name, in fixed order, always visible. */
 
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import SixAgentWorkflowRail from "../components/agents/SixAgentWorkflowRail";
 import type { AgentRunLike } from "../components/agents/SixAgentWorkflowRail";
@@ -48,7 +48,7 @@ describe("SixAgentWorkflowRail", () => {
       },
     ];
     render(<SixAgentWorkflowRail runs={runs} />);
-    expect(screen.getByText("Blocked")).toBeInTheDocument();
+    expect(screen.getAllByText("Blocked").length).toBeGreaterThan(0);
     expect(
       screen.getByText(/Missing date range — clarification draft prepared\./),
     ).toBeInTheDocument();
@@ -56,8 +56,33 @@ describe("SixAgentWorkflowRail", () => {
 
   it("uses the exact official names from the agent theme registry", () => {
     render(<SixAgentWorkflowRail />);
+    const rail = screen.getByRole("list", { name: "Six-Agent Workflow Rail" });
     for (const name of OFFICIAL_NAMES_IN_ORDER) {
-      expect(screen.getByText(name)).toBeInTheDocument();
+      expect(within(rail).getByText(name)).toBeInTheDocument();
     }
+  });
+
+  it("uses one focused command bar for rerun instructions", () => {
+    const onRerunAgent = vi.fn();
+    const runs: AgentRunLike[] = [
+      {
+        agentId: "triaging_agent",
+        status: "complete",
+        outputSummary: "Classified as Location Data Production.",
+      },
+    ];
+
+    render(<SixAgentWorkflowRail runs={runs} onRerunAgent={onRerunAgent} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Triaging Agent/ }));
+    fireEvent.change(screen.getByLabelText(/Ask an agent to revise/i), {
+      target: { value: "Re-check date range against request text" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Request redraft" }));
+
+    expect(onRerunAgent).toHaveBeenCalledWith(
+      "triaging_agent",
+      "Re-check date range against request text",
+    );
   });
 });

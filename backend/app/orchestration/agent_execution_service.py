@@ -14,8 +14,8 @@ failing run and everything after it.
 """
 
 import asyncio
-import logging
 import hashlib
+import logging
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -35,13 +35,18 @@ from app.adk_agents.registry import (
     TRIAGING_AGENT,
 )
 from app.adk_agents.root_agent import create_caseflow_root_agent
-from app.llm.model_assist import ModelAssist
 from app.errors import AgentExecutionStateError, NotFoundError
+from app.llm.model_assist import ModelAssist
 from app.logging_config import correlation_id_var
 from app.mock_data.seed import MOCK_DATA_DIR
 from app.models.agent_run import AgentRun, AgentRunDraft
 from app.models.classification_result import ClassificationResult
-from app.models.enums import ActorType, AgentRunStatus, AuditAction
+from app.models.enums import (
+    ActorType,
+    AgentRunDecision,
+    AgentRunStatus,
+    AuditAction,
+)
 from app.models.legal_request import LegalRequest
 from app.models.note_draft import NoteDraft
 from app.models.production_package import ProductionPackage
@@ -113,11 +118,18 @@ class AgentExecutionService:
         persist one AgentRun + one audit event per agent."""
         request = self._load(legal_request_id)
         initial_state = self._build_input_state(request)
+        pinned_runs = self._pinned_runs_by_agent(request)
+        for agent_id, run in pinned_runs.items():
+            initial_state[session_state.run_key(agent_id)] = run.model_dump(
+                mode="json", include=set(AgentRunDraft.model_fields)
+            )
         final_state = asyncio.run(
-            self._execute(create_caseflow_root_agent(self._mock_data_dir, self.llm_assist),
-            initial_state,)
+            self._execute(
+                create_caseflow_root_agent(self._mock_data_dir, self.llm_assist),
+                initial_state,
+            )
         )
-        return self._persist(request, final_state, RAIL_ORDER)
+        return self._persist(request, final_state, RAIL_ORDER, pinned_runs=pinned_runs)
 
     def run_single(
         self,
@@ -126,6 +138,7 @@ class AgentExecutionService:
         *,
         requested_draft_type: str | None = None,
         requested_note_type: str | None = None,
+        human_instruction: str | None = None,
     ) -> AgentRun:
         """Run one rail agent with context rebuilt from persisted runs."""
         request = self._load(legal_request_id)
@@ -139,6 +152,8 @@ class AgentExecutionService:
             initial_state[session_state.REQUESTED_DRAFT_TYPE] = requested_draft_type
         if requested_note_type is not None:
             initial_state[session_state.REQUESTED_NOTE_TYPE] = requested_note_type
+        if human_instruction is not None:
+            initial_state[session_state.HUMAN_INSTRUCTIONS] = {agent.name: human_instruction}
 
         final_state = asyncio.run(self._execute(agent, initial_state))
         return self._persist(request, final_state, (agent.name,))[0]
@@ -185,12 +200,20 @@ class AgentExecutionService:
         request: LegalRequest,
         final_state: dict[str, Any],
         agent_ids: tuple[str, ...],
+        *,
+        pinned_runs: dict[str, AgentRun] | None = None,
     ) -> list[AgentRun]:
+        pinned_runs = pinned_runs or {}
         input_hash = hashlib.sha256(
             request.model_dump_json().encode()
         ).hexdigest()[:16]
         persisted: list[AgentRun] = []
         for agent_id in agent_ids:
+            pinned = pinned_runs.get(agent_id)
+            if pinned is not None:
+                persisted.append(pinned)
+                self._apply_artifacts(request, pinned)
+                continue
             draft = session_state.get_run_draft(final_state, agent_id)
             if draft is None:
                 # An agent that produced no draft is itself an audited failure.
@@ -247,6 +270,24 @@ class AgentExecutionService:
         self._requests.save(request)
         return persisted
 
+    def _pinned_runs_by_agent(self, request: LegalRequest) -> dict[str, AgentRun]:
+        """Latest accepted human verdict per agent pins that exact run until
+        a later send-back clears the pin."""
+        pinned: dict[str, AgentRun] = {}
+        for review in request.agent_run_reviews:
+            if review.decision == AgentRunDecision.SENT_BACK:
+                pinned.pop(review.agent_id, None)
+                continue
+            if (
+                review.decision != AgentRunDecision.ACCEPTED
+                or review.agent_run_id is None
+            ):
+                continue
+            run = self._runs.get(review.agent_run_id)
+            if run is not None:
+                pinned[review.agent_id] = run
+        return pinned
+
     @staticmethod
     def _audit_action(agent_id: str, draft: AgentRunDraft) -> AuditAction:
         if agent_id == TEXT_CONTENT_AGENT and draft.output.get("text_draft"):
@@ -275,4 +316,7 @@ class AgentExecutionService:
             if output.get("production_package"):
                 request.production_package = ProductionPackage.model_validate(
                     output["production_package"]
+                )
+                request.package_validation_findings = (
+                    request.production_package.validation_findings
                 )

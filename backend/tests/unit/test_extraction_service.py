@@ -6,6 +6,8 @@ from app.models.legal_request import LegalRequest
 from app.services.request_extraction_service import (
     PLACEHOLDER_PATTERNS,
     RequestExtractionService,
+    build_source_sections,
+    build_source_trace_target,
     contains_placeholder,
 )
 
@@ -71,3 +73,42 @@ def test_contains_placeholder_is_case_insensitive():
     assert contains_placeholder("please delete this block")
     assert contains_placeholder("Between DATE OF INTEREST and now")
     assert not contains_placeholder("Detective Sarah Johnson")
+
+
+def test_source_trace_target_resolves_span_to_stable_section_id():
+    sections = build_source_sections(
+        "\n".join(
+            [
+                "AFFIDAVIT FOR SEARCH WARRANT",
+                "Narrative introduction.",
+                "THE FOLLOWING RECORDS",
+                "GPS location records for account ACC-7784512.",
+                "FOLLOWING TIME PERIOD",
+                "Between May 10, 2026 and May 15, 2026.",
+            ]
+        )
+    )
+
+    target = build_source_trace_target("account ACC-7784512", sections)
+
+    assert target is not None
+    assert target.section_id == "02-requested-records"
+    assert target.source_span == "account ACC-7784512"
+    assert target.match == "exact_span"
+
+
+def test_source_trace_target_uses_normalized_span_matching():
+    sections = build_source_sections(
+        "\n".join(
+            [
+                "THE FOLLOWING RECORDS",
+                "GPS location records for account ACC-7784512.",
+            ]
+        )
+    )
+
+    target = build_source_trace_target("records for account\nACC-7784512", sections)
+
+    assert target is not None
+    assert target.section_id == "01-requested-records"
+    assert target.match == "normalized_span"

@@ -110,6 +110,7 @@ export function makeProductionPackage(
       chain_of_custody: "Text Content Agent",
       certification: "Text Content Agent",
     },
+    validation_findings: [],
     ...overrides,
   };
 }
@@ -132,6 +133,7 @@ export function makeLegalRequest(
     },
     legal_process: {
       type: "search_warrant",
+      components: ["search_warrant"],
       court_order_included: true,
       ex_parte_order: false,
       pen_register: false,
@@ -176,13 +178,36 @@ export function makeLegalRequest(
       production_deadline_days: 35,
       service_deadline_days: 14,
       nondisclosure_period: null,
+      ongoing_duration_days: null,
+      ongoing_update_interval_minutes: null,
     },
     legal_authorities: [
       { citation: "18 U.S.C. §2703", description: null, source_span: null },
     ],
+    source_sections: [
+      {
+        section_id: "caption",
+        title: "Caption and authority",
+        start_line: 1,
+        end_line: 1,
+        text: "SEARCH WARRANT (SYNTHETIC).",
+      },
+      {
+        section_id: "records",
+        title: "Requested records",
+        start_line: 2,
+        end_line: 2,
+        text: "GPS location records for account ACC-7784512 between 2026-05-10 and 2026-05-15.",
+      },
+    ],
+    scope_authority_checks: [],
     deficiency_findings: [],
+    package_validation_findings: [],
     reviews: [],
     approvals: [],
+    human_overrides: [],
+    agent_run_reviews: [],
+    attestations: [],
     agent_runs: {},
     classification: null,
     routing_recommendation: null,

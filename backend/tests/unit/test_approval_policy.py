@@ -2,6 +2,7 @@ import pytest
 
 from app.models.deficiency_finding import DeficiencyFinding
 from app.models.enums import (
+    AttestationItem,
     DeficiencyCode,
     DeficiencySeverity,
     LegalProcessType,
@@ -9,6 +10,8 @@ from app.models.enums import (
 )
 from app.models.legal_process import LegalProcess
 from app.models.legal_request import LegalRequest
+from app.models.lers_quality import PackageValidationFinding, ScopeAuthorityCheck
+from app.models.production_package import ProductionPackage
 from app.models.special_handling import SpecialHandlingFlags
 from app.orchestration.approval_policy import ApprovalPolicy
 
@@ -43,6 +46,7 @@ def test_search_warrant_requires_review():
         ("location_tracking_requested", ReviewReason.LOCATION_TRACKING_REQUESTED),
         ("content_requested", ReviewReason.CONTENT_REQUESTED),
         ("tombstone_requested", ReviewReason.TOMBSTONE_REQUESTED),
+        ("ongoing_access_requested", ReviewReason.ONGOING_COLLECTION_REQUESTED),
     ],
 )
 def test_special_handling_flags_require_review(flag, expected_reason):
@@ -50,6 +54,20 @@ def test_special_handling_flags_require_review(flag, expected_reason):
     result = ApprovalPolicy().evaluate(request)
     assert result.human_review_required
     assert expected_reason in result.review_reasons
+
+
+def test_ongoing_collection_requires_explicit_attestation():
+    request = make_request(
+        special_handling=SpecialHandlingFlags(
+            ongoing_access_requested=True,
+            ongoing_duration_days=60,
+            ongoing_update_interval_minutes=15,
+        )
+    )
+
+    assert AttestationItem.ONGOING_COLLECTION_REVIEWED in (
+        ApprovalPolicy().required_attestations(request)
+    )
 
 
 def test_missing_date_range_requires_review_and_blocks():
@@ -132,3 +150,67 @@ def test_warning_deficiencies_surface_as_warnings_not_blockers():
     result = ApprovalPolicy().evaluate(request)
     assert result.blocking_reasons == []
     assert result.warnings == ["overbroad"]
+
+
+def test_scope_authority_mismatch_requires_review_without_blocking():
+    request = make_request(
+        scope_authority_checks=[
+            ScopeAuthorityCheck(
+                category="GPS Location Records",
+                status="missing_authority",
+                required_citations=["C.R.S. §16-3-303.5"],
+                matched_citations=[],
+                message=(
+                    "Requested category does not have an obvious matching cited "
+                    "authority."
+                ),
+            )
+        ]
+    )
+
+    result = ApprovalPolicy().evaluate(request)
+
+    assert ReviewReason.SCOPE_AUTHORITY_MISMATCH in result.review_reasons
+    assert result.blocking_reasons == []
+    assert result.warnings == [
+        "GPS Location Records: Requested category does not have an obvious matching "
+        "cited authority."
+    ]
+    assert AttestationItem.AUTHORITY_SCOPE_MATCH_CONFIRMED in (
+        ApprovalPolicy().required_attestations(request)
+    )
+
+
+def test_package_validation_findings_map_to_policy_reasons_and_blockers():
+    request = make_request(
+        package_validation_findings=[
+            PackageValidationFinding(
+                code="record_count_mismatch",
+                severity="blocking",
+                section="record_index",
+                message="summary count does not match records",
+            ),
+            PackageValidationFinding(
+                code="certification_incomplete",
+                severity="blocking",
+                section="certification",
+                message="certification missing representative",
+            ),
+        ],
+        production_package=ProductionPackage(
+            request_id="LER-TEST-1", production_id="PROD-TEST-1"
+        ),
+    )
+
+    result = ApprovalPolicy().evaluate(request)
+
+    assert ReviewReason.RECORD_COUNT_MISMATCH in result.review_reasons
+    assert ReviewReason.CERTIFICATION_INCOMPLETE in result.review_reasons
+    assert result.blocking_reasons == [
+        "record_count_mismatch",
+        "certification_incomplete",
+    ]
+    assert {
+        AttestationItem.PACKAGE_COMPLETENESS_CONFIRMED,
+        AttestationItem.CERTIFICATION_REVIEWED,
+    } <= set(ApprovalPolicy().required_attestations(request))

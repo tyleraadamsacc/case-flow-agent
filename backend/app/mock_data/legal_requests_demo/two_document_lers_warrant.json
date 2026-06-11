@@ -182,6 +182,8 @@
       "tombstone_requested": true,
       "production_deadline_days": 35,
       "service_deadline_days": 14,
+      "ongoing_duration_days": 60,
+      "ongoing_update_interval_minutes": 15,
       "nondisclosure_period": "one year"
     },
     "legal_authorities": [

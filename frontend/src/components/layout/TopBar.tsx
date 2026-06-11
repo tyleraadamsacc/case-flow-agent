@@ -1,5 +1,14 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
 
+import { useOptionalActor } from "../identity/ActorContext";
+import {
+  ACTOR_OPTIONS,
+  getActor,
+  roleLabel,
+  setActor as persistActor,
+} from "../identity/actorStore";
+import Chip from "../ui/Chip";
 import StatusBadge from "../ui/StatusBadge";
 
 export interface TopBarProps {
@@ -12,6 +21,23 @@ export interface TopBarProps {
  * persistent synthetic-data badge — every screen declares its data is
  * synthetic (plan §13). */
 export default function TopBar({ title, actions }: TopBarProps) {
+  const actorContext = useOptionalActor();
+  const [fallbackActor, setFallbackActor] = useState(() => getActor());
+  const actor = actorContext?.actor ?? fallbackActor;
+
+  function selectActor(actorId: string) {
+    const next = ACTOR_OPTIONS.find((option) => option.actorId === actorId);
+    if (!next) {
+      return;
+    }
+    if (actorContext) {
+      actorContext.setActor(next);
+    } else {
+      persistActor(next);
+      setFallbackActor(next);
+    }
+  }
+
   return (
     <header className="cf-topbar">
       <span className="cf-topbar__brand">
@@ -26,6 +52,26 @@ export default function TopBar({ title, actions }: TopBarProps) {
       ) : null}
       <span className="cf-topbar__spacer" />
       <StatusBadge status="synthetic_mock" />
+      <label className="cf-topbar__actor">
+        <span>Active actor</span>
+        <select
+          className="cf-input cf-topbar__actor-select"
+          value={actor.actorId}
+          onChange={(event) => selectActor(event.target.value)}
+        >
+          {ACTOR_OPTIONS.map((option) => (
+            <option key={option.actorId} value={option.actorId}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Chip
+        className="cf-topbar__role-chip"
+        tone={actor.role === "senior_analyst" ? "green" : "blue"}
+      >
+        Role: {roleLabel(actor.role)}
+      </Chip>
       {actions ? <span className="cf-topbar__actions">{actions}</span> : null}
     </header>
   );

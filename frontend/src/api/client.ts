@@ -2,14 +2,21 @@
  * draft/prepare/review operations — the backend has no send, release,
  * or disclosure endpoint, and this client must never grow one. */
 
+import { getActor } from "../components/identity/actorStore";
 import type {
   ActionResponse,
   AgentRun,
+  AgentRunReviewResponse,
   ApproveResponse,
+  AttestBody,
+  AttestResponse,
   AuditEvent,
   DraftRunResponse,
   ExtractResponse,
+  FinalizationStatus,
   LegalRequest,
+  OverrideBody,
+  OverrideResponse,
   ProductionPackage,
   RailRunResponse,
   ResponsiveRecord,
@@ -30,9 +37,17 @@ export class ApiError extends Error {
 }
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
+  // The acting reviewer rides on every request; the backend uses it for
+  // dual-control finalization and to attribute every human action.
+  const actor = getActor();
   const response = await fetch(path, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers: {
+      "Content-Type": "application/json",
+      "X-CaseFlow-Actor": actor.actorId,
+      "X-CaseFlow-Role": actor.role,
+      ...init?.headers,
+    },
   });
   if (!response.ok) {
     let detail: unknown = response.statusText;
@@ -118,6 +133,39 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  // Human-in-the-lead actions. None of these send, release, or finalize
+  // on an agent's behalf: override corrects an agent field, attest records
+  // a human confirmation, and the agent rerun/accept keep the person in
+  // the lead over each agent.
+  finalizationStatus: (id: string) =>
+    http<FinalizationStatus>(
+      `${BASE}/${encodeURIComponent(id)}/finalization-status`,
+    ),
+
+  override: (id: string, body: OverrideBody) =>
+    http<OverrideResponse>(`${BASE}/${encodeURIComponent(id)}/override`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  attest: (id: string, body: AttestBody) =>
+    http<AttestResponse>(`${BASE}/${encodeURIComponent(id)}/attest`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  rerunAgent: (id: string, agentId: string, instruction?: string) =>
+    http<AgentRunReviewResponse>(
+      `${BASE}/${encodeURIComponent(id)}/agents/${encodeURIComponent(agentId)}/rerun`,
+      { method: "POST", body: JSON.stringify({ instruction }) },
+    ),
+
+  acceptAgentRun: (id: string, agentId: string, comments?: string) =>
+    http<AgentRunReviewResponse>(
+      `${BASE}/${encodeURIComponent(id)}/agents/${encodeURIComponent(agentId)}/accept`,
+      { method: "POST", body: JSON.stringify({ comments }) },
+    ),
 
   auditTimeline: (id: string) =>
     http<AuditEvent[]>(`${BASE}/${encodeURIComponent(id)}/audit`),

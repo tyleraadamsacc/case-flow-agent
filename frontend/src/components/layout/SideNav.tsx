@@ -66,9 +66,13 @@ export default function SideNav({
   items = DEFAULT_NAV_ITEMS,
   activeId,
   onSelect,
-  defaultCollapsed = false,
+  defaultCollapsed = true,
 }: SideNavProps) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
+
+  function toggleCollapsed() {
+    setCollapsed((value) => !value);
+  }
 
   return (
     <nav
@@ -85,6 +89,7 @@ export default function SideNav({
               className="cf-sidenav__item"
               aria-current={item.id === activeId ? "page" : undefined}
               title={collapsed ? item.label : undefined}
+              aria-label={collapsed ? item.label : undefined}
               onClick={() => onSelect?.(item.id)}
             >
               <span className="cf-sidenav__icon">{item.icon}</span>
@@ -98,12 +103,16 @@ export default function SideNav({
           type="button"
           className="cf-sidenav__item"
           aria-expanded={!collapsed}
-          onClick={() => setCollapsed((value) => !value)}
+          title={collapsed ? "Expand navigation" : "Collapse navigation"}
+          aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+          onClick={toggleCollapsed}
         >
           <span className="cf-sidenav__icon">
             <NavIcon path={collapsed ? "m9 18 6-6-6-6" : "m15 18-6-6 6-6"} />
           </span>
-          <span className="cf-sidenav__label">Collapse</span>
+          <span className="cf-sidenav__label">
+            {collapsed ? "Expand" : "Collapse"}
+          </span>
         </button>
       </div>
     </nav>

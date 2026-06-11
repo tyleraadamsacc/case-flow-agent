@@ -11,6 +11,18 @@ from app.models.deficiency_finding import DeficiencyFinding
 from app.models.enums import DeficiencyCode, DeficiencySeverity, LegalProcessType
 from app.models.legal_request import LegalRequest
 
+UNRESOLVED_PLACEHOLDER_PATTERNS: tuple[str, ...] = (
+    "YOUR NAME HERE",
+    "ACCOUNT NAME [IF KNOWN]",
+    "GOOGLE ID(UID) [IF KNOWN]",
+    "ESN / IMEI / MEID [IF KNOWN]",
+    "MAC ID [IF KNOWN]",
+    "DATE OF INTEREST",
+    "LIST CRIMINAL OFFENSE(S)",
+    "YOUR EMAIL ADDRESS",
+    "LAW ENFORCEMENT AGENGY",
+)
+
 
 class DeficiencyService:
     def __init__(self, rules_path: Path) -> None:
@@ -42,6 +54,21 @@ class DeficiencyService:
         ):
             findings.append(self._finding(DeficiencyCode.AMBIGUOUS_REQUEST_TYPE))
 
+        unresolved_placeholders = self._unresolved_placeholders(request.raw_source_text)
+        if unresolved_placeholders:
+            finding = self._finding(DeficiencyCode.UNRESOLVED_TEMPLATE_PLACEHOLDER)
+            finding.message = (
+                f"{finding.message} Unresolved marker(s): "
+                f"{', '.join(unresolved_placeholders)}."
+            )
+            findings.append(finding)
+
+        if any(
+            check.status in {"needs_review", "missing_authority"}
+            for check in request.scope_authority_checks
+        ):
+            findings.append(self._finding(DeficiencyCode.SCOPE_AUTHORITY_MISMATCH))
+
         return findings
 
     def _finding(self, code: DeficiencyCode) -> DeficiencyFinding:
@@ -54,3 +81,14 @@ class DeficiencyService:
             suggested_resolution=rule.get("suggested_resolution"),
             evidence_ids=[rule["evidence_id"]] if rule.get("evidence_id") else [],
         )
+
+    @staticmethod
+    def _unresolved_placeholders(raw_source_text: str | None) -> list[str]:
+        if not raw_source_text:
+            return []
+        upper = raw_source_text.upper()
+        return [
+            pattern
+            for pattern in UNRESOLVED_PLACEHOLDER_PATTERNS
+            if pattern in upper
+        ]

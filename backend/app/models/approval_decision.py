@@ -21,6 +21,9 @@ class ApprovalDecision(CaseFlowModel):
     target_type: ReviewTargetType
     decision: ApprovalDecisionType
     decided_by: str
+    # Reviewer role at decision time; dual control needs to know whether a
+    # senior co-signer is among the approvers.
+    role: str = "analyst"
     policy_reasons: list[ReviewReason] = []
     comments: str | None = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -7,6 +7,7 @@ behind the same output contract.
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,7 @@ from app.models.base import CaseFlowModel
 from app.models.legal_authority import LegalAuthority
 from app.models.legal_process import LegalProcess
 from app.models.legal_request import LegalRequest
+from app.models.lers_quality import SourceDocumentSection, SourceTraceTarget
 from app.models.requested_data_category import RequestedDataCategory
 from app.models.requested_period import RequestedPeriod
 from app.models.requesting_agency import RequestingAgency
@@ -26,8 +28,28 @@ PLACEHOLDER_PATTERNS: tuple[str, ...] = (
     "PLEASE DELETE",
     "YOUR NAME HERE",
     "ACCOUNT NAME [IF KNOWN]",
+    "GOOGLE ID(UID) [IF KNOWN]",
+    "ESN / IMEI / MEID [IF KNOWN]",
+    "MAC ID [IF KNOWN]",
     "DATE OF INTEREST",
     "LIST CRIMINAL OFFENSE(S)",
+    "YOUR EMAIL ADDRESS",
+    "LAW ENFORCEMENT AGENGY",
+)
+
+SECTION_MARKERS: tuple[tuple[str, str], ...] = (
+    ("INSTRUCTIONS", "Instructions"),
+    ("AFFIDAVIT FOR SEARCH WARRANT", "Affidavit and Request"),
+    ("THE FOLLOWING RECORDS", "Requested Records"),
+    ("FOLLOWING ACCOUNT", "Subject Account"),
+    ("FOLLOWING TIME PERIOD", "Requested Period"),
+    ("REQUESTED FOR EVIDENCE", "Offense Statement"),
+    ("18 U.S.C.", "Legal Authority"),
+    ("FACTS TENDING", "Probable Cause"),
+    ("IT IS ORDERED", "Court Order"),
+    ("IT IS FURTHER ORDERED", "Special Orders"),
+    ("RECORDS SHOULD BE PROVIDED", "Production Instructions"),
+    ("NOTARIZED ATTESTATION", "Certification Requirement"),
 )
 
 
@@ -117,6 +139,7 @@ class RequestExtractionService:
         return result
 
     def apply(self, request: LegalRequest, extraction: ExtractionResult) -> None:
+        request.source_sections = build_source_sections(request.raw_source_text or "")
         request.legal_process = extraction.legal_process
         request.requesting_agency = extraction.requesting_agency
         request.subject_identifiers = extraction.subject_identifiers
@@ -125,6 +148,95 @@ class RequestExtractionService:
         request.requested_period = extraction.requested_period
         request.special_handling = extraction.special_handling
         request.legal_authorities = extraction.legal_authorities
+
+
+def build_source_sections(source_text: str) -> list[SourceDocumentSection]:
+    """Create coarse, navigable sections from LERS template/source text."""
+    lines = source_text.splitlines()
+    if not lines:
+        return []
+
+    starts: list[tuple[int, str]] = [(0, _title_for_line(lines[0]) or "Source Document")]
+    seen = {0}
+    for index, line in enumerate(lines[1:], start=1):
+        title = _title_for_line(line)
+        if title and index not in seen:
+            starts.append((index, title))
+            seen.add(index)
+
+    sections: list[SourceDocumentSection] = []
+    for position, (start, title) in enumerate(starts):
+        end = (starts[position + 1][0] - 1) if position + 1 < len(starts) else len(lines) - 1
+        text = "\n".join(lines[start : end + 1]).strip()
+        if not text:
+            continue
+        sections.append(
+            SourceDocumentSection(
+                section_id=_section_id(title, len(sections) + 1),
+                title=title,
+                start_line=start + 1,
+                end_line=end + 1,
+                text=text,
+            )
+        )
+    return sections
+
+
+def build_source_trace_target(
+    source_span: str | None,
+    source_sections: list[SourceDocumentSection],
+) -> SourceTraceTarget | None:
+    """Resolve an extracted source span to a stable source-section target."""
+    if not source_span or not source_sections:
+        return None
+
+    for section in source_sections:
+        if source_span in section.text:
+            return SourceTraceTarget(
+                section_id=section.section_id,
+                source_span=source_span,
+                match="exact_span",
+            )
+
+    normalized_span = _normalize_trace_text(source_span)
+    if not normalized_span:
+        return None
+    for section in source_sections:
+        if normalized_span in _normalize_trace_text(section.text):
+            return SourceTraceTarget(
+                section_id=section.section_id,
+                source_span=source_span,
+                match="normalized_span",
+            )
+    return None
+
+
+def _title_for_line(line: str) -> str | None:
+    upper = line.upper()
+    for marker, title in SECTION_MARKERS:
+        if marker in upper:
+            return title
+    stripped = line.strip()
+    if (
+        12 <= len(stripped) <= 90
+        and ")" not in stripped
+        and ":" not in stripped
+        and "_" not in stripped
+        and "*" not in stripped
+        and stripped != "JUDGE / MAGISTRATE"
+        and re.fullmatch(r"[A-Z0-9 /&().,'-]+", stripped)
+    ):
+        return stripped.title()
+    return None
+
+
+def _section_id(title: str, index: int) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-") or "section"
+    return f"{index:02d}-{slug}"
+
+
+def _normalize_trace_text(value: str) -> str:
+    return re.sub(r"\s+", " ", value).casefold().strip()
 
 
 def _validate_optional(model_type: type, payload: Any) -> Any:

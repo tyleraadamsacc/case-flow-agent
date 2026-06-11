@@ -1,0 +1,12 @@
+[
+  {
+    "record_id": "SUB-N-0001",
+    "timestamp_utc": "2026-05-03T14:21:00Z",
+    "source": "Account Profile"
+  },
+  {
+    "record_id": "SUB-N-0002",
+    "timestamp_utc": "2026-05-18T09:42:00Z",
+    "source": "Login History"
+  }
+]

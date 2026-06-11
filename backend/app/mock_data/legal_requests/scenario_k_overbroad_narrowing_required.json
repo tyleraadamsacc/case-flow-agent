@@ -1,0 +1,107 @@
+{
+  "legal_request_id": "LER-2026-004923",
+  "scenario": "K",
+  "source_type": "lers_request_template",
+  "date_received": "2026-06-10",
+  "raw_source_uri": "local://legal_requests/scenario_k_overbroad_narrowing_required.json",
+  "raw_source_text": "SEARCH WARRANT - To: Google LLC, Google Legal Investigations Support (LERS). The affiant requests subscriber information, Gmail contents, YouTube watch history, Drive files, and Google Voice SMS/MMS for account user.synthetic.k@example.com between 2026-03-01 and 2026-06-01 pursuant to 18 U.S.C. §2703 and Crim. P. 41. SYNTHETIC DATA - NOT A REAL LEGAL DOCUMENT.",
+  "extracted_fields": {
+    "legal_process": {
+      "type": "search_warrant",
+      "court_order_included": true,
+      "ex_parte_order": false,
+      "pen_register": false,
+      "trap_and_trace": false,
+      "location_tracking": false,
+      "stored_communications": true
+    },
+    "requesting_agency": {
+      "agency": "Orange County Digital Evidence Unit (Synthetic)",
+      "case_number": "MC-26-80623",
+      "officer": "Detective Morgan Lee",
+      "contact_email": "synthetic.digital@example.gov",
+      "phone": "555-0113"
+    },
+    "subject_identifiers": [
+      {
+        "type": "gmail_account",
+        "value": "user.synthetic.k@example.com",
+        "confidence": 0.99,
+        "source_span": "account user.synthetic.k@example.com"
+      }
+    ],
+    "requested_data_categories": [
+      {
+        "category": "Subscriber Information",
+        "product_domain": "Account / Subscriber",
+        "sensitivity": "medium",
+        "content_type": "subscriber",
+        "requires_sme_review": false
+      },
+      {
+        "category": "Email Contents",
+        "product_domain": "Gmail",
+        "sensitivity": "high",
+        "content_type": "content",
+        "requires_sme_review": true
+      },
+      {
+        "category": "YouTube Search and Watch History",
+        "product_domain": "YouTube",
+        "sensitivity": "high",
+        "content_type": "activity",
+        "requires_sme_review": true
+      },
+      {
+        "category": "Drive Files",
+        "product_domain": "Drive / Docs / Sheets / Slides",
+        "sensitivity": "high",
+        "content_type": "content",
+        "requires_sme_review": true
+      },
+      {
+        "category": "Google Voice SMS/MMS",
+        "product_domain": "Google Voice",
+        "sensitivity": "high",
+        "content_type": "content",
+        "requires_sme_review": true
+      }
+    ],
+    "product_domains": [
+      "Account / Subscriber",
+      "Gmail",
+      "YouTube",
+      "Drive / Docs / Sheets / Slides",
+      "Google Voice"
+    ],
+    "requested_period": {
+      "start": "2026-03-01T00:00:00Z",
+      "end": "2026-06-01T23:59:59Z"
+    },
+    "special_handling": {
+      "sealed": false,
+      "non_disclosure_to_subscriber": false,
+      "no_adverse_action": false,
+      "pen_register_requested": false,
+      "trap_and_trace_requested": false,
+      "ongoing_access_requested": false,
+      "location_tracking_requested": false,
+      "content_requested": true,
+      "tombstone_requested": false,
+      "production_deadline_days": 35,
+      "service_deadline_days": 14
+    },
+    "legal_authorities": [
+      {
+        "citation": "18 U.S.C. §2703",
+        "description": "Stored Communications Act",
+        "source_span": "pursuant to 18 U.S.C. §2703"
+      },
+      {
+        "citation": "Crim. P. 41",
+        "description": "Search warrant rule",
+        "source_span": "and Crim. P. 41"
+      }
+    ]
+  }
+}
