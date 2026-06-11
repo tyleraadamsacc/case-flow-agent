@@ -45,7 +45,7 @@ export default function ResponsePackageView({
   return (
     <Card className="cf-package">
       <div className="cf-package__watermark" role="note">
-        Draft — pending analyst review · synthetic / mock data
+        Draft, pending analyst review · synthetic / mock data
       </div>
 
       <div className="cf-package__header">
@@ -61,7 +61,7 @@ export default function ResponsePackageView({
 
       <Section name="Requesting agency" provenance={provenance.requesting_agency}>
         <p className="cf-package__text">
-          {pkg.requesting_agency?.agency ?? "—"}
+          {pkg.requesting_agency?.agency ?? "Not recorded"}
           {pkg.requesting_agency?.case_number
             ? ` · case ${pkg.requesting_agency.case_number}`
             : ""}
@@ -106,7 +106,7 @@ export default function ResponsePackageView({
       >
         {pkg.records.length === 0 ? (
           <p className="cf-package__text">
-            No responsive records — no-records response draft.
+            No responsive records: no-records response draft.
           </p>
         ) : (
           <div className="cf-package__table-wrap">
@@ -127,10 +127,10 @@ export default function ResponsePackageView({
                   <tr key={record.record_id}>
                     <td>{record.record_id}</td>
                     <td>{formatDateTime(record.timestamp_utc)}</td>
-                    <td>{record.latitude ?? "—"}</td>
-                    <td>{record.longitude ?? "—"}</td>
-                    <td>{record.accuracy_meters ?? "—"}</td>
-                    <td>{record.source ?? "—"}</td>
+                    <td>{record.latitude ?? "n/a"}</td>
+                    <td>{record.longitude ?? "n/a"}</td>
+                    <td>{record.accuracy_meters ?? "n/a"}</td>
+                    <td>{record.source ?? "n/a"}</td>
                     <td>
                       <Chip tone="violet">{record.data_confidence}</Chip>
                     </td>
@@ -159,8 +159,8 @@ export default function ResponsePackageView({
       <Section name="Chain of custody" provenance={provenance.chain_of_custody}>
         <p className="cf-package__text">
           Collected {formatDate(pkg.chain_of_custody.collection_date)} via{" "}
-          {pkg.chain_of_custody.collection_method ?? "—"} by{" "}
-          {pkg.chain_of_custody.collected_by ?? "—"}.{" "}
+          {pkg.chain_of_custody.collection_method ?? "method not recorded"} by{" "}
+          {pkg.chain_of_custody.collected_by ?? "collector not recorded"}.{" "}
           <Chip tone="amber" dot>
             {humanizeToken(pkg.chain_of_custody.review_status)}
           </Chip>
@@ -169,7 +169,7 @@ export default function ResponsePackageView({
 
       <Section name="Certification" provenance={provenance.certification}>
         <p className="cf-package__text">
-          {pkg.certification.certification_text ?? "—"}
+          {pkg.certification.certification_text ?? "Not drafted yet."}
         </p>
         <div className="cf-preview__row">
           <Chip tone="neutral">

@@ -56,12 +56,12 @@ export function humanizeToken(value: string): string {
 }
 
 export function formatDate(value: string | null | undefined): string {
-  return value ? value.slice(0, 10) : "—";
+  return value ? value.slice(0, 10) : "not stated";
 }
 
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) {
-    return "—";
+    return "not recorded";
   }
   return value.replace("T", " ").slice(0, 16) + " UTC";
 }

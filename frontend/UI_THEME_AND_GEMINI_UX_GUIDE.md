@@ -107,11 +107,15 @@ reserved for cards that navigate somewhere.
 The gradient means **agent activity or intelligence** — nothing else.
 Permitted uses, exhaustively:
 
-1. A **running** agent card/badge (gradient border + soft shimmer)
+1. A **running** agent card/badge/mini-rail segment (gradient border +
+   soft shimmer)
 2. The **primary action glow** (`Button glow` — at most one per screen)
 3. **Insight cards** (3px top accent strip only)
-4. The **brand mark** in the top bar
-5. Subtle header accents
+4. The **brand mark** in the top bar and the 2px **top-bar hairline**
+   (35% opacity)
+5. Subtle header accents: the `--gemini-wash` hero backdrop (alpha
+   ≤ 0.08, fades out above the content) and the **current step node**
+   on the workflow progress line
 
 Never as a card background, never on text, never on more than one
 attention-seeking element at a time.
@@ -284,3 +288,46 @@ A screen or component matches this guide when:
    soft canvas behind white cards.
 10. Nothing in the UI offers an agent-initiated approve / finalize /
     release / send affordance.
+
+## 19. Polish-pass modules
+
+Added in the executive-polish pass; all build on the same tokens.
+
+- **Hero panel (`.cf-hero`)** — page-level summary card with the
+  `--gemini-wash` backdrop and a `.cf-hero__facts` grid of labeled
+  facts. Request Detail uses it for agency / process / case / received /
+  deadline / owner. Facts use micro-caps labels; values truncate with
+  ellipsis, never wrap.
+- **Workflow progress (`.cf-flow`)** — the request's journey on one
+  line: Received → Extracted → Validated → Agent drafts → Analyst
+  review → Approved → Audit complete. Done steps are blue, the current
+  step carries the gradient node. The indicator can only pass "Analyst
+  review" through a recorded human decision.
+- **Queue pulse strip (`.cf-pulse-strip`)** — clickable state summaries
+  above the queue (All / New intake / Agent workflow / Human decision /
+  Blocked / Finalized). Each tile is a filter with `aria-pressed`;
+  Blocked is an overlay (blocking deficiency or blocked/failed run),
+  not a workflow state.
+- **Six-agent mini rail (`.cf-minirail`)** — six segments per queue
+  row, one per agent in rail order, colored by latest run status.
+  Waiting segments stay visible; the rail never collapses into an
+  aggregate. Run data is hydrated per request from the agent-runs
+  endpoint because the list endpoint does not embed runs.
+- **RFP Agent Coverage cards (`.cf-coverage-grid`)** — governance shows
+  the six agents as agent-ops tiles in the rail's 3×2 shape. Exceptions
+  (blocked / failed / needs review) render as chips before totals; an
+  agent with no activity shows zeros and "No exceptions", never
+  disappears.
+- **Audit day groups + actor-toned dots** — the timeline groups events
+  under day separators; the spine dot is toned by actor type (human
+  blue, service violet, system gray) and carries the agent's accent
+  for agent events.
+- **Skeleton loading (`.cf-skeleton`)** — row-shaped shimmer
+  placeholders for queue / governance / audit / attention loading.
+  The shimmer stills under `prefers-reduced-motion`.
+- **Composed empty states (`.cf-empty`)** — title + one sentence that
+  says how the view becomes populated. Never a bare "No data".
+- **Punctuation rule** — no em-dashes in UI copy. Use periods,
+  commas, colons, semicolons, or parentheses. (Backend-authored
+  strings shown verbatim, such as audit summaries and document text,
+  are data and out of scope.)

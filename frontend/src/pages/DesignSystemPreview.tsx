@@ -24,7 +24,7 @@ const SCENARIO_C_RUNS: AgentRunLike[] = [
     agentId: "indexing_agent",
     status: "complete",
     confidence: 0.95,
-    inputSummary: "LER-2026-004835 — court order, 2 identifiers, 1 data category.",
+    inputSummary: "LER-2026-004835: court order, 2 identifiers, 1 data category.",
     outputSummary: "Labeled Pen Register / Trap and Trace; matched 2 intake SOP entries.",
     evidenceIds: ["SOP-PEN-001", "SOP-INTAKE-002"],
     auditEventId: "evt_3f9a01",
@@ -48,7 +48,7 @@ const SCENARIO_C_RUNS: AgentRunLike[] = [
     agentId: "etl_agent",
     status: "blocked",
     blockedReason:
-      "SME escalation pending — mock retrieval is on hold until a human approves the route.",
+      "SME escalation pending; mock retrieval is on hold until a human approves the route.",
     riskFlags: ["sme_escalation_pending"],
     auditEventId: "evt_3f9a03",
     auditAction: "etl_simulated",
@@ -58,7 +58,7 @@ const SCENARIO_C_RUNS: AgentRunLike[] = [
     agentId: "note_taking_and_data_entry_agent",
     status: "complete",
     confidence: 0.88,
-    outputSummary: "Drafted routing rationale note — pending analyst approval.",
+    outputSummary: "Drafted routing rationale note, pending analyst approval.",
     auditEventId: "evt_3f9a04",
     auditAction: "note_drafted",
     requiresHumanReview: true,
@@ -68,7 +68,7 @@ const SCENARIO_C_RUNS: AgentRunLike[] = [
     agentId: "text_content_agent",
     status: "complete",
     confidence: 0.91,
-    outputSummary: "Drafted SME notification — pending analyst approval.",
+    outputSummary: "Drafted SME notification, pending analyst approval.",
     evidenceIds: ["TMPL-SME-001"],
     auditEventId: "evt_3f9a05",
     auditAction: "sme_notification_drafted",
@@ -78,7 +78,7 @@ const SCENARIO_C_RUNS: AgentRunLike[] = [
   {
     agentId: "automation_agent",
     status: "complete",
-    outputSummary: "Prepared SME escalation — pending analyst approval.",
+    outputSummary: "Prepared SME escalation, pending analyst approval.",
     auditEventId: "evt_3f9a06",
     auditAction: "workflow_action_prepared",
     requiresHumanReview: true,
@@ -123,7 +123,7 @@ export default function DesignSystemPreview() {
       <Section
         title="Six-Agent Workflow Rail"
         description="The product's most important component. All six RFP agents, by
-          official name, in fixed order — blocked runs stay visible with their
+          official name, in fixed order; blocked runs stay visible with their
           reason. Sample data mirrors Scenario C (pen register, SME escalation)."
       >
         <SixAgentWorkflowRail runs={SCENARIO_C_RUNS} />
@@ -131,7 +131,7 @@ export default function DesignSystemPreview() {
 
       <Section
         title="Agent card states"
-        description="Waiting, running, needs review, and failed — the states not
+        description="Waiting, running, needs review, and failed: the states not
           shown in the Scenario C rail above."
       >
         <div className="cf-preview__grid">
@@ -149,7 +149,7 @@ export default function DesignSystemPreview() {
             ordinal={2}
             status="needs_review"
             roleDescription="Classifies the request and recommends a route for human approval."
-            outputSummary="Legal process type is unclear — classification needs human review."
+            outputSummary="Legal process type is unclear; classification needs human review."
             confidence={0.55}
             requiresHumanReview
             reviewReasons={["low_confidence_classification"]}
@@ -167,14 +167,14 @@ export default function DesignSystemPreview() {
             ordinal={6}
             status="failed"
             roleDescription="Prepares the next workflow action; a human always executes it."
-            blockedReason="Run raised an unexpected error. Retry available — the failure was audited."
+            blockedReason="Run raised an unexpected error. Retry available; the failure was audited."
           />
         </div>
       </Section>
 
       <Section
         title="Status badges"
-        description="Every state carries a text label — color never stands alone.
+        description="Every state carries a text label; color never stands alone.
           Running is the only gradient-treated status."
       >
         <div className="cf-preview__row">
@@ -257,7 +257,7 @@ export default function DesignSystemPreview() {
           <Card
             variant="insight"
             title="Location requests are driving SLA risk"
-            subtitle="Suggested action — pending human decision"
+            subtitle="Suggested action, pending human decision"
           >
             <p style={{ margin: "0 0 var(--space-3)", color: "var(--text-secondary)" }}>
               Maps / Location requests represent 38% of open backlog and 62% of

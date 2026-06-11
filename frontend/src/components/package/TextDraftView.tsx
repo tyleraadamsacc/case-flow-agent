@@ -19,7 +19,7 @@ export default function TextDraftView({ draft }: { draft: TextDraft }) {
   return (
     <Card
       title={DRAFT_TITLES[draft.draft_type] ?? humanizeToken(draft.draft_type)}
-      subtitle="Drafted by Text Content Agent — pending analyst review"
+      subtitle="Drafted by Text Content Agent, pending analyst review"
     >
       <div className="cf-package__header">
         <StatusBadge status="draft" />

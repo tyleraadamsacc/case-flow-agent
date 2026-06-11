@@ -125,7 +125,7 @@ describe("RequestDetailPage", () => {
       await screen.findByText("PROD-LER-2026-004812-01"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Draft — pending analyst review · synthetic \/ mock data/),
+      screen.getByText(/Draft, pending analyst review · synthetic \/ mock data/),
     ).toBeInTheDocument();
     expect(screen.getByText("Draft pending analyst review")).toBeInTheDocument();
     // Section provenance chips (scoped to the package — the rail also
