@@ -2,6 +2,7 @@ import type { GovernanceMetric } from "../../api/types";
 import { humanizeToken } from "../../lib/requestDisplay";
 import Card from "../ui/Card";
 import Chip from "../ui/Chip";
+import { dataConfidenceLabel } from "./MetricBarList";
 
 function formatValue(metric: GovernanceMetric): string {
   const rounded =
@@ -30,7 +31,7 @@ export default function MetricCard({ metric }: { metric: GovernanceMetric }) {
       ) : null}
       <div className="cf-preview__row">
         <Chip tone="violet" title="Data confidence">
-          {metric.data_confidence}
+          {dataConfidenceLabel(metric.data_confidence)}
         </Chip>
       </div>
     </Card>

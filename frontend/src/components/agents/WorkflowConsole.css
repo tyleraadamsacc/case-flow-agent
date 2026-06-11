@@ -331,6 +331,209 @@
 
 /* ---------- Active six-agent workflow console ---------- */
 
+/* Request detail hero and review polish live here because the workflow
+   console stylesheet is the approved page-level polish surface for this work. */
+
+.cf-detail-header {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.cf-detail-hero__topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.cf-detail-header__title {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.cf-detail-hero__eyebrow,
+.cf-review__eyebrow,
+.cf-agent-timeline-shell__header span {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-micro);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cf-detail-header__title > h1 {
+  margin: 0;
+  line-height: 1;
+}
+
+.cf-detail-hero__badges,
+.cf-detail-hero__signals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.cf-detail-hero__badges {
+  justify-content: flex-end;
+}
+
+.cf-detail-hero__summary {
+  max-width: 860px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 1.04rem;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.cf-detail-hero__signals {
+  padding: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.cf-detail-header .cf-hero__facts {
+  margin-top: 0;
+}
+
+.cf-fields__summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.cf-fields__summary > div {
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  padding: var(--space-3);
+}
+
+.cf-fields__summary span {
+  display: block;
+  color: var(--text-primary);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cf-fields__summary small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: var(--font-micro);
+}
+
+.cf-fields__group {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.72);
+  padding: var(--space-3);
+}
+
+.cf-fields__group:has(.cf-inline-edit) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), var(--surface-soft));
+}
+
+.cf-source-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.cf-doc__section {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  transition:
+    background var(--motion-fast),
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast);
+}
+
+.cf-doc__section--active {
+  border-color: rgba(26, 115, 232, 0.42);
+  background: linear-gradient(180deg, var(--blue-soft), rgba(255, 255, 255, 0.92));
+  box-shadow: inset 3px 0 0 var(--blue);
+}
+
+.cf-review__hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-items: start;
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+}
+
+.cf-review__hero h3 {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-section);
+  line-height: 1.2;
+}
+
+.cf-review__hero p:last-child {
+  margin: var(--space-1) 0 0;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.cf-review__route-card {
+  display: grid;
+  gap: var(--space-1);
+  border: 1px solid rgba(26, 115, 232, 0.2);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, rgba(232, 240, 254, 0.72), rgba(255, 255, 255, 0.86));
+  padding: var(--space-3);
+}
+
+.cf-review__route-card strong {
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.cf-review__route-card p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.cf-review__section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.cf-review__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cf-review__actions .cf-button {
+  justify-content: center;
+}
+
+.cf-review__supporting-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
 .cf-workflow-console {
   display: grid;
   gap: var(--space-4);
@@ -350,6 +553,15 @@
     var(--gemini-wash);
   box-shadow: var(--shadow-bar);
   min-width: 0;
+}
+
+.cf-workflow-story__guardrails {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .cf-workflow-story__copy,
@@ -504,6 +716,27 @@
   margin: 0;
 }
 
+.cf-agent-timeline-shell {
+  min-width: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), var(--surface-soft));
+  padding: var(--space-3);
+}
+
+.cf-agent-timeline-shell__header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: baseline;
+  margin-bottom: var(--space-3);
+}
+
+.cf-agent-timeline-shell__header strong {
+  color: var(--text-primary);
+  font-size: var(--font-small);
+}
+
 .cf-agent-timeline {
   display: grid;
   gap: 0;
@@ -643,6 +876,21 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.cf-agent-node__meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cf-agent-node__meta span::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.45;
 }
 
 .cf-agent-detail,
@@ -949,14 +1197,19 @@
 @media (max-width: 900px) {
   .cf-workflow-story,
   .cf-workflow-grid,
-  .cf-command-bar {
+  .cf-command-bar,
+  .cf-detail-hero__topline,
+  .cf-review__hero {
+    display: grid;
     grid-template-columns: 1fr;
   }
 
   .cf-readiness-strip,
   .cf-trust-grid,
   .cf-rerun-diff,
-  .cf-rerun-diff dl {
+  .cf-rerun-diff dl,
+  .cf-fields__summary,
+  .cf-review__actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -969,6 +1222,10 @@
   .cf-command-bar .cf-button {
     justify-content: center;
     width: 100%;
+  }
+
+  .cf-detail-hero__badges {
+    justify-content: flex-start;
   }
 }
 
@@ -984,7 +1241,9 @@
   .cf-trust-grid,
   .cf-rerun-diff,
   .cf-rerun-diff dl,
-  .cf-workflow-story__metrics {
+  .cf-workflow-story__metrics,
+  .cf-fields__summary,
+  .cf-review__actions {
     grid-template-columns: 1fr;
   }
 

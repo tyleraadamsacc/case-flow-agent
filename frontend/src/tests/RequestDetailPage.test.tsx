@@ -109,7 +109,7 @@ describe("RequestDetailPage", () => {
       screen.getByRole("button", { name: "Send to QA" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Finalize request" }),
+      screen.getByRole("button", { name: "Record approval" }),
     ).toBeInTheDocument();
     expect(
       screen.getByText("All decisions are made by a person"),
@@ -306,17 +306,19 @@ describe("RequestDetailPage", () => {
     expect(
       await screen.findByText("PROD-LER-2026-004812-01"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Draft, pending analyst review · synthetic \/ mock data/),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Draft pending analyst review")).toBeInTheDocument();
+    expect(screen.getAllByText("Draft pending analyst review").length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getAllByText("Synthetic / mock data").length).toBeGreaterThan(0);
     // Section provenance chips (scoped to the package — the rail also
     // shows the agents by name).
     const pkg = document.querySelector(".cf-package") as HTMLElement;
-    expect(within(pkg).getByText("ETL Agent")).toBeInTheDocument();
-    expect(within(pkg).getAllByText("Text Content Agent").length).toBeGreaterThan(0);
+    expect(within(pkg).getAllByText(/ETL Agent/).length).toBeGreaterThan(0);
+    expect(within(pkg).getAllByText(/Text Content Agent/).length).toBeGreaterThan(
+      0,
+    );
     // Synthetic record labeling on every record row.
-    expect(within(pkg).getAllByText("synthetic_mock")).toHaveLength(2);
+    expect(within(pkg).getAllByText("Synthetic / mock")).toHaveLength(2);
     expect(within(pkg).getByText("Draft pending approval")).toBeInTheDocument();
   });
 

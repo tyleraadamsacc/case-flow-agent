@@ -87,6 +87,7 @@ export default function SourceDocumentPanel({
     ...(request.legal_authorities ?? []).map((authority) => authority.source_span),
     activeTraceTarget?.source_span,
   ].filter((span): span is string => Boolean(span));
+  const highlightedSpanCount = new Set(spans).size;
 
   useEffect(() => {
     setActiveSectionId(firstSectionId);
@@ -125,6 +126,17 @@ export default function SourceDocumentPanel({
     >
       {sourceSections.length > 0 ? (
         <>
+          <div className="cf-source-toolbar" aria-label="Source document summary">
+            <Chip tone="violet">Synthetic / mock data</Chip>
+            <Chip tone="neutral">
+              {sourceSections.length} section
+              {sourceSections.length === 1 ? "" : "s"}
+            </Chip>
+            <Chip tone={highlightedSpanCount ? "blue" : "neutral"} dot={highlightedSpanCount > 0}>
+              {highlightedSpanCount} highlighted source span
+              {highlightedSpanCount === 1 ? "" : "s"}
+            </Chip>
+          </div>
           <div
             className="cf-source-nav"
             aria-label="Source document section navigator"
@@ -160,15 +172,11 @@ export default function SourceDocumentPanel({
                     sectionRefs.current[section.section_id] = node;
                   }}
                   aria-current={active ? "true" : undefined}
-                  style={{
-                    border: active
-                      ? "1px solid var(--blue)"
-                      : "1px solid var(--border-subtle)",
-                    borderRadius: "var(--radius-md)",
-                    background: active ? "var(--blue-soft)" : "var(--surface-card)",
-                    padding: "var(--space-3)",
-                    marginBottom: "var(--space-3)",
-                  }}
+                  className={
+                    active
+                      ? "cf-doc__section cf-doc__section--active"
+                      : "cf-doc__section"
+                  }
                 >
                   <header
                     className="cf-doc__section-header"

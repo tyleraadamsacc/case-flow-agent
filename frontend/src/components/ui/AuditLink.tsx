@@ -1,3 +1,5 @@
+import { humanizeToken } from "../../lib/requestDisplay";
+
 export interface AuditLinkProps {
   auditEventId?: string | null;
   /** Audit action name (e.g. "request_classified") — preferred display
@@ -9,7 +11,7 @@ export interface AuditLinkProps {
   className?: string;
 }
 
-/** "Audit: request_classified" — proof the run was logged. Renders
+/** "Audit: Request classified" — proof the run was logged. Renders
  * nothing when there is no audit event to reference. */
 export default function AuditLink({
   auditEventId,
@@ -41,7 +43,9 @@ export default function AuditLink({
         <path d="M12 22s8-3 8-10V5l-8-3-8 3v7c0 7 8 10 8 10z" />
         <path d="m9 12 2 2 4-4" />
       </svg>
-      <span className="cf-meta-link__label">Audit: {action ?? auditEventId}</span>
+      <span className="cf-meta-link__label">
+        Audit: {humanizeToken(action ?? auditEventId ?? "")}
+      </span>
     </button>
   );
 }

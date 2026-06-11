@@ -42,4 +42,20 @@ describe("ResponsePackageView", () => {
     expect(blocking.className).toContain("cf-chip--red");
     expect(warning.className).toContain("cf-chip--amber");
   });
+
+  it("renders a reviewable draft package workspace with guardrail labels", () => {
+    render(<ResponsePackageView pkg={makeProductionPackage()} />);
+
+    expect(
+      screen.getByLabelText("Reviewable response package document"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Provenance and review panel"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("Draft pending analyst review").length).toBeGreaterThan(0);
+    expect(screen.getByText("Synthetic / mock data")).toBeInTheDocument();
+    expect(screen.getByText("Chain of custody review")).toBeInTheDocument();
+    expect(screen.getByText("Certification review")).toBeInTheDocument();
+    expect(screen.getAllByText("Synthetic / mock").length).toBeGreaterThan(0);
+  });
 });

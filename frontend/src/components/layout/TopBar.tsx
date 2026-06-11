@@ -52,6 +52,13 @@ export default function TopBar({ title, actions }: TopBarProps) {
       ) : null}
       <span className="cf-topbar__spacer" />
       <StatusBadge status="synthetic_mock" />
+      <Chip
+        className="cf-topbar__guardrail-chip"
+        tone="cyan"
+        title="Workflow outputs stay in human review."
+      >
+        Human review required
+      </Chip>
       <label className="cf-topbar__actor">
         <span>Active actor</span>
         <select

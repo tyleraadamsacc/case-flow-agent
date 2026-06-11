@@ -6,16 +6,16 @@ import { STATUS_META, statusMeta } from "../theme/status";
 
 describe("StatusBadge", () => {
   it.each([
-    ["waiting", "Waiting"],
-    ["running", "Running"],
+    ["waiting", "Pending"],
+    ["running", "Preparing"],
     ["complete", "Complete"],
     ["blocked", "Blocked"],
-    ["failed", "Failed"],
-    ["needs_review", "Needs review"],
+    ["failed", "Review required"],
+    ["needs_review", "Human review required"],
     ["draft", "Draft"],
     ["prepared", "Prepared"],
-    ["pending_approval", "Pending approval"],
-    ["audit_complete", "Audit complete"],
+    ["pending_approval", "Pending review"],
+    ["audit_complete", "Audit event logged"],
     ["audit_exception", "Audit exception"],
     ["synthetic_mock", "Synthetic / mock data"],
   ])("maps %s to the label %s", (status, label) => {
@@ -26,6 +26,15 @@ describe("StatusBadge", () => {
   it("covers every status key in STATUS_META", () => {
     // The table above must stay in sync with the status map.
     expect(Object.keys(STATUS_META)).toHaveLength(12);
+  });
+
+  it.each([
+    ["sent_to_qa", "Pending QA review"],
+    ["analyst_approved", "Analyst review recorded"],
+    ["approved_by_analyst", "Analyst review recorded"],
+    ["prepared_pending_human", "Prepared, pending review"],
+  ])("maps raw backend status %s to human-led label %s", (status, label) => {
+    expect(statusMeta(status).label).toBe(label);
   });
 
   it("degrades unknown statuses to a humanized neutral label", () => {

@@ -6,8 +6,8 @@
  * disclosure, or final legal determination. */
 
 /** Visual tone — resolved to colors by components.css. Tones map to
- * meaning: green = done, gradient = agent running, amber = human
- * attention, red = blocked/exception, blue = draft/prepared,
+ * meaning: green = logged/recorded, gradient = preparation in progress,
+ * amber = human attention, red = blocked/exception, blue = draft/prepared,
  * violet = synthetic/mock, neutral = idle. */
 export type StatusTone =
   | "neutral"
@@ -43,29 +43,29 @@ export interface StatusMeta {
 }
 
 export const STATUS_META: Record<WorkflowStatusKey, StatusMeta> = {
-  waiting: { label: "Waiting", tone: "neutral" },
-  running: { label: "Running", tone: "gradient" },
+  waiting: { label: "Pending", tone: "neutral" },
+  running: { label: "Preparing", tone: "gradient" },
   complete: { label: "Complete", tone: "green" },
   blocked: { label: "Blocked", tone: "red" },
-  needs_review: { label: "Needs review", tone: "amber" },
-  failed: { label: "Failed", tone: "red" },
+  needs_review: { label: "Human review required", tone: "amber" },
+  failed: { label: "Review required", tone: "red" },
   draft: { label: "Draft", tone: "blue" },
   prepared: { label: "Prepared", tone: "blue" },
-  pending_approval: { label: "Pending approval", tone: "amber" },
-  audit_complete: { label: "Audit complete", tone: "green" },
+  pending_approval: { label: "Pending review", tone: "amber" },
+  audit_complete: { label: "Audit event logged", tone: "green" },
   audit_exception: { label: "Audit exception", tone: "red" },
   synthetic_mock: { label: "Synthetic / mock data", tone: "violet" },
 };
 
 /** Backend WorkflowState values → display meta. Drafted/intermediate
  * states read blue (work in progress), human-decision states read amber,
- * completed states green. */
+ * audit-recorded states green. */
 export const WORKFLOW_STATE_META: Record<string, StatusMeta> = {
   request_received: { label: "Received", tone: "neutral" },
-  request_extracted: { label: "Extracted", tone: "blue" },
-  request_indexed: { label: "Indexed", tone: "blue" },
-  request_classified: { label: "Classified", tone: "blue" },
-  request_validated: { label: "Validated", tone: "blue" },
+  request_extracted: { label: "Intake extracted", tone: "blue" },
+  request_indexed: { label: "Indexed for review", tone: "blue" },
+  request_classified: { label: "Classified for review", tone: "blue" },
+  request_validated: { label: "Validation prepared", tone: "blue" },
   route_recommended: { label: "Route recommended", tone: "blue" },
   etl_simulated: { label: "ETL simulated", tone: "blue" },
   note_drafted: { label: "Note drafted", tone: "blue" },
@@ -75,11 +75,11 @@ export const WORKFLOW_STATE_META: Record<string, StatusMeta> = {
     tone: "blue",
   },
   analyst_review_pending: { label: "Analyst review pending", tone: "amber" },
-  analyst_approved: { label: "Analyst approved", tone: "green" },
+  analyst_approved: { label: "Analyst review recorded", tone: "green" },
   escalated: { label: "Escalated", tone: "amber" },
-  sent_to_qa: { label: "Sent to QA", tone: "blue" },
+  sent_to_qa: { label: "Pending QA review", tone: "blue" },
   changes_requested: { label: "Changes requested", tone: "amber" },
-  audit_complete: { label: "Audit complete", tone: "green" },
+  audit_complete: { label: "Audit event logged", tone: "green" },
 };
 
 /** Pending-human literals the backend stamps on drafted artifacts. Every
@@ -93,11 +93,11 @@ export const DRAFT_STATUS_META: Record<string, StatusMeta> = {
     tone: "blue",
   },
   recommended_pending_human: {
-    label: "Recommended, pending human",
+    label: "Recommended, pending review",
     tone: "blue",
   },
-  prepared_pending_human: { label: "Prepared, pending human", tone: "blue" },
-  approved_by_analyst: { label: "Approved by analyst", tone: "green" },
+  prepared_pending_human: { label: "Prepared, pending review", tone: "blue" },
+  approved_by_analyst: { label: "Analyst review recorded", tone: "green" },
 };
 
 /** Resolve a status string to display meta. Unknown statuses degrade to a

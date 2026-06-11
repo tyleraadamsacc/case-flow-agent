@@ -95,7 +95,7 @@ function finalizeDisabledReasons(
     return ["Request already finalized"];
   }
   if (!status) {
-    return ["Checking finalization readiness"];
+    return ["Checking approval readiness"];
   }
   if (status.ready_for_approval) {
     return [];
@@ -174,6 +174,15 @@ export default function ReviewPanel({
   );
   const routeApprovalDisabled = routeApprovalDisabledReasons.length > 0;
   const finalizeDisabled = finalizeReasons.length > 0;
+  const primaryActionLabel = finalizeDisabled
+    ? routeApprovalDisabled
+      ? "Resolve review blockers"
+      : "Approve route"
+    : "Record approval";
+  const checklistDone =
+    finalizationStatus?.required_attestations.filter((item) => attested.has(item))
+      .length ?? 0;
+  const checklistTotal = finalizationStatus?.required_attestations.length ?? 0;
 
   useEffect(() => {
     setRouteOverride(request.routing_recommendation?.target_queue ?? "");
@@ -223,7 +232,16 @@ export default function ReviewPanel({
   return (
     <div className="cf-review">
       <Card title="Human review" subtitle="All decisions are made by a person">
-        <div className="cf-review__state">
+        <div className="cf-review__hero">
+          <div>
+            <p className="cf-review__eyebrow">Current decision surface</p>
+            <h3>{primaryActionLabel}</h3>
+            <p>
+              {readyForApproval
+                ? "Checklist is ready for recorded human approval."
+                : "Review the route, risk flags, and checklist before recording the next human action."}
+            </p>
+          </div>
           <StatusBadge status={request.workflow_state} />
         </div>
         <div className="cf-review__approval-state" aria-label="Active reviewer">
@@ -231,17 +249,19 @@ export default function ReviewPanel({
             {actor.label}
           </Chip>
           <Chip tone="neutral">Role: {roleLabel(actor.role)}</Chip>
+          <Chip tone="violet">Synthetic / mock data</Chip>
         </div>
 
         {routing ? (
           <div className="cf-review__recommendation">
-            <p>
-              Recommended route: <strong>{routing.target_queue ?? "pending"}</strong>
-              {routing.reason ? (
-                <span className="cf-fields__muted"> · {routing.reason}</span>
-              ) : null}{" "}
-              <Chip tone="blue">Pending human approval</Chip>
-            </p>
+            <div className="cf-review__route-card">
+              <span className="cf-review__eyebrow">Recommended route</span>
+              <strong>{routing.target_queue ?? "pending"}</strong>
+              {routing.reason ? <p>{routing.reason}</p> : null}
+              <Chip tone="amber" dot>
+                Pending review
+              </Chip>
+            </div>
             <div className="cf-review__inline-action">
               <input
                 className="cf-input"
@@ -336,7 +356,14 @@ export default function ReviewPanel({
         ) : null}
 
         <div className="cf-review__finalization">
-          <h4 className="cf-fields__label">Finalization checklist</h4>
+          <div className="cf-review__section-heading">
+            <h4 className="cf-fields__label">Finalization checklist</h4>
+            {finalizationStatus ? (
+              <Chip tone={readyForApproval ? "green" : "amber"} dot>
+                {checklistDone}/{checklistTotal} attested
+              </Chip>
+            ) : null}
+          </div>
           {finalizationStatus ? (
             <>
               <div className="cf-review__approval-state">
@@ -412,7 +439,7 @@ export default function ReviewPanel({
               ) : null}
             </>
           ) : (
-            <p className="cf-fields__muted">Checking finalization readiness...</p>
+            <p className="cf-fields__muted">Checking approval readiness...</p>
           )}
         </div>
 
@@ -444,6 +471,28 @@ export default function ReviewPanel({
           >
             {busy === "Route approval" ? "Approving..." : "Approve route"}
           </Button>
+          <Button
+            variant="filled"
+            disabled={finalizeDisabled}
+            onClick={() =>
+              act("Approval", async () => {
+                const response = await api.approve(request.legal_request_id, {
+                  comments: trimmed || undefined,
+                });
+                const finalNotice = response.awaiting_approval
+                  ? `Approval ${response.approvals_recorded} of ${response.approvals_required} recorded. A senior reviewer must co-sign when required.`
+                  : response.finalized
+                    ? "Approval recorded. Audit event logged."
+                    : "Approval recorded. Audit completion is still blocked.";
+                return { request: response.legal_request, notice: finalNotice };
+              })
+            }
+          >
+            {busy === "Approval" ? "Recording..." : "Record approval"}
+          </Button>
+        </div>
+
+        <div className="cf-review__supporting-actions">
           <Button
             disabled={busy !== null}
             onClick={() =>
@@ -485,24 +534,6 @@ export default function ReviewPanel({
           >
             Send to QA
           </Button>
-          <Button
-            disabled={finalizeDisabled}
-            onClick={() =>
-              act("Finalization", async () => {
-                const response = await api.approve(request.legal_request_id, {
-                  comments: trimmed || undefined,
-                });
-                const finalNotice = response.awaiting_approval
-                  ? `Approval ${response.approvals_recorded} of ${response.approvals_required} recorded. A senior reviewer must co-sign when required.`
-                  : response.finalized
-                    ? "Finalization complete. Audit event logged."
-                    : "Approval recorded. Audit completion is still blocked.";
-                return { request: response.legal_request, notice: finalNotice };
-              })
-            }
-          >
-            {busy === "Finalization" ? "Finalizing..." : "Finalize request"}
-          </Button>
         </div>
         {routeApprovalDisabledReasons.length > 0 || finalizeReasons.length > 0 ? (
           <ul className="cf-review__blockers" aria-label="Disabled action reasons">
@@ -517,7 +548,7 @@ export default function ReviewPanel({
             {finalizeReasons.map((reason) => (
               <li key={`finalize-${reason}`}>
                 <Chip tone="amber" dot>
-                  Finalize disabled
+                  Approval recording disabled
                 </Chip>{" "}
                 {reason}
               </li>
@@ -526,8 +557,8 @@ export default function ReviewPanel({
         ) : null}
         <p className="cf-review__hint">
           Approving the route records your routing decision. Use agent redraft
-          controls for blocked runs, then finalize once the checklist and
-          approval policy pass.
+          controls for blocked runs, then record approval once the checklist
+          and approval policy pass.
         </p>
 
         {error ? <p className="cf-review__error">{error}</p> : null}

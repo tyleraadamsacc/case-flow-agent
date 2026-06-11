@@ -77,18 +77,20 @@ describe("ReviewPanel role-based review UX", () => {
     expect(screen.getAllByText("Certification reviewed").length).toBeGreaterThan(0);
   });
 
-  it("explains disabled finalization with concise mapped reason rows", async () => {
+  it("explains disabled approval recording with concise mapped reason rows", async () => {
     renderReview(finalizationStatus());
 
-    const finalize = await screen.findByRole("button", {
-      name: "Finalize request",
+    const approval = await screen.findByRole("button", {
+      name: "Record approval",
     });
-    expect(finalize).toBeDisabled();
+    expect(approval).toBeDisabled();
 
     const reasons = screen.getByRole("list", {
       name: "Disabled action reasons",
     });
-    expect(within(reasons).getByText("Finalize disabled")).toBeInTheDocument();
+    expect(
+      within(reasons).getByText("Approval recording disabled"),
+    ).toBeInTheDocument();
     expect(
       within(reasons).getByText(
         "Missing attestations: Authority checked, Ongoing reviewed, Package complete, Certification reviewed",

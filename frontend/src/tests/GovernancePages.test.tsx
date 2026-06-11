@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -115,8 +115,54 @@ describe("GovernanceInsightsPage", () => {
     }
     // Data confidence is labeled, and the metric strip renders.
     expect(screen.getByText("Open backlog")).toBeInTheDocument();
-    expect(screen.getAllByText("synthetic_mock").length).toBeGreaterThan(0);
-    expect(screen.getByText(/leads request volume/)).toBeInTheDocument();
+    expect(screen.getAllByText("Synthetic / mock").length).toBeGreaterThan(0);
+    expect(screen.getByText(/Executive view of request volume/)).toBeInTheDocument();
+  });
+
+  it("renders product-domain charts as a top-five ranked view first", async () => {
+    vi.spyOn(governanceApi, "summary").mockResolvedValue({ metrics: [] });
+    vi.spyOn(governanceApi, "agentActivity").mockResolvedValue({ agents: [] });
+    vi.spyOn(governanceApi, "productVolume").mockResolvedValue({
+      metrics: Array.from({ length: 6 }, (_, index) =>
+        metric({
+          metric_id: `product_volume:Domain ${index + 1}`,
+          title: `Requests touching Domain ${index + 1}`,
+          dimension: "product_domain",
+          value: 6 - index,
+        }),
+      ),
+    });
+    vi.spyOn(governanceApi, "processingTimeByProduct").mockResolvedValue({
+      metrics: [],
+    });
+    vi.spyOn(governanceApi, "bottlenecks").mockResolvedValue({ metrics: [] });
+    vi.spyOn(governanceApi, "responsePackageStatus").mockResolvedValue({
+      metrics: [],
+    });
+    vi.spyOn(governanceApi, "auditReadiness").mockResolvedValue({
+      requests_total: 0,
+      requests_with_all_required_events: 0,
+      coverage_percent: 0,
+      missing_events_by_request: {},
+      finalization_blocked_events: 0,
+      data_confidence: "fully_tracked",
+    });
+    vi.spyOn(governanceApi, "workNeedingAttention").mockResolvedValue({
+      items: [],
+    });
+
+    render(
+      <MemoryRouter>
+        <GovernanceInsightsPage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Top product domains")).toBeInTheDocument();
+    expect(screen.getByText("Domain 1")).toBeInTheDocument();
+    expect(screen.getByText("Domain 5")).toBeInTheDocument();
+    expect(screen.queryByText("Domain 6")).not.toBeInTheDocument();
+    expect(screen.getByText("Show all 6 (1 more)")).toBeInTheDocument();
+    expect(screen.getByText("Top 5 shown first")).toBeInTheDocument();
   });
 
   it("always shows all six agents even if the backend omits some", async () => {
@@ -181,6 +227,11 @@ describe("WorkNeedingAttentionPage", () => {
     expect(screen.getByText("Pen register")).toBeInTheDocument();
     expect(screen.getByText("Sme escalation prepared")).toBeInTheDocument();
     expect(screen.getByText("P100")).toBeInTheDocument();
+    expect(screen.getByText("Responsible owner")).toBeInTheDocument();
+    expect(screen.getAllByText("Triaging Agent").length).toBeGreaterThan(0);
+    expect(screen.getByText("Review the prepared SME escalation")).toBeInTheDocument();
+    expect(screen.getByText("Evidence: open request")).toBeInTheDocument();
+    expect(screen.getByText("Audit: inspect trail")).toBeInTheDocument();
     expect(screen.getByText(/2 related agent runs/)).toBeInTheDocument();
   });
 });
@@ -189,7 +240,14 @@ describe("AuditPage", () => {
   it("offers all six official agents as filters and queries the API with the selection", async () => {
     const spy = vi
       .spyOn(governanceApi, "auditEvents")
-      .mockResolvedValue([AUDIT_EVENT]);
+      .mockResolvedValue([
+        {
+          ...AUDIT_EVENT,
+          summary:
+            "Triaging Agent classified the request with a longer audit summary that should remain compact in the timeline card.",
+          after_state: "route_recommended",
+        },
+      ]);
 
     render(
       <MemoryRouter>
@@ -209,9 +267,24 @@ describe("AuditPage", () => {
       legal_request_id: undefined,
     });
     expect(
-      await screen.findByText("Triaging Agent classified the request."),
+      await screen.findByText(/Triaging Agent classified the request/),
     ).toBeInTheDocument();
+    expect(screen.getByText("Visible events")).toBeInTheDocument();
+    expect(screen.getByText("Agent actions")).toBeInTheDocument();
     expect(screen.getByText("Request classified")).toBeInTheDocument();
+    expect(screen.getAllByText("Triaging Agent").length).toBeGreaterThan(0);
+    expect(
+      screen.getByText("Request validated to Route recommended"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Evidence: ROUTE-LOC-001")).toBeInTheDocument();
+
+    const summary = screen.getByText(/longer audit summary/);
+    expect(summary.className).toContain("cf-timeline__summary--clamp");
+
+    fireEvent.click(screen.getByRole("button", { name: "Detail" }));
+    expect(screen.getByText("Event id")).toBeInTheDocument();
+    expect(
+      screen.getAllByText("Request validated to Route recommended").length,
+    ).toBeGreaterThan(1);
   });
 });

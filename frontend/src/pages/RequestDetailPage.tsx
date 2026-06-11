@@ -130,6 +130,16 @@ export default function RequestDetailPage() {
     (finding) => finding.severity === "blocking",
   );
   const sourceSections = request.source_sections ?? [];
+  const completedAgents = Object.values(request.agent_runs).filter(
+    (run) => run.status === "complete",
+  ).length;
+  const reviewFlags = [
+    ...(request.classification?.review_reasons ?? []),
+    ...Object.values(request.agent_runs).flatMap((run) => run.risk_flags),
+    ...request.deficiency_findings
+      .filter((finding) => finding.severity === "blocking")
+      .map((finding) => finding.code),
+  ];
 
   function resolveTraceTarget(
     sourceSpan: string | null | undefined,
@@ -167,17 +177,42 @@ export default function RequestDetailPage() {
       }
     >
       <header className="cf-hero cf-detail-header">
-        <div className="cf-detail-header__title">
-          <h1>{request.legal_request_id}</h1>
-          <StatusBadge status={state} />
-          {request.urgency_tier ? (
-            <Chip tone="red" dot>
-              {request.urgency_tier}
-            </Chip>
-          ) : null}
+        <div className="cf-detail-hero__topline">
+          <div className="cf-detail-header__title">
+            <p className="cf-detail-hero__eyebrow">Request command center</p>
+            <h1>{request.legal_request_id}</h1>
+          </div>
+          <div className="cf-detail-hero__badges">
+            <StatusBadge status={state} />
+            <StatusBadge status="synthetic_mock" />
+            {request.urgency_tier ? (
+              <Chip tone="red" dot>
+                {request.urgency_tier}
+              </Chip>
+            ) : null}
+          </div>
         </div>
+        <p className="cf-detail-hero__summary">
+          {agencyName(request)} request for {legalProcessLabel(request)}. Six
+          agents prepare draft work only; human review is required before any
+          route, package, or final audit decision is recorded.
+        </p>
         <div className="cf-detail-header__meta">
           <WorkflowProgress state={state} />
+        </div>
+        <div className="cf-detail-hero__signals" aria-label="Request readiness summary">
+          <Chip tone={completedAgents === 6 ? "green" : "blue"} dot>
+            {completedAgents}/6 agents complete
+          </Chip>
+          <Chip tone={reviewFlags.length ? "amber" : "green"} dot>
+            {reviewFlags.length
+              ? `${reviewFlags.length} review flag${reviewFlags.length === 1 ? "" : "s"}`
+              : "No review flags"}
+          </Chip>
+          <Chip tone={blockedDeficiency ? "red" : "neutral"} dot={blockedDeficiency}>
+            {blockedDeficiency ? "Human review required" : "Draft workflow"}
+          </Chip>
+          <Chip tone="blue">Prepared next action: {nextAction(state)}</Chip>
         </div>
         <div className="cf-hero__facts">
           <div className="cf-fact">
@@ -238,7 +273,6 @@ export default function RequestDetailPage() {
               ? "Running six agents…"
               : "Run six-agent workflow"}
           </Button>
-          <Chip tone="neutral">Next: {nextAction(state)}</Chip>
         </div>
         {actionError ? <p className="cf-review__error">{actionError}</p> : null}
       </header>

@@ -81,6 +81,14 @@ export default function SideNav({
         .join(" ")}
       aria-label="Primary"
     >
+      <div className="cf-sidenav__header">
+        <span className="cf-sidenav__brand-mark" aria-hidden="true" />
+        <span className="cf-sidenav__brand-copy">
+          <span className="cf-sidenav__brand-name">CaseFlow</span>
+          <span className="cf-sidenav__brand-meta">Prototype console</span>
+        </span>
+      </div>
+      <span className="cf-sidenav__rail-label">Synthetic / mock data</span>
       <ul className="cf-sidenav__list">
         {items.map((item) => (
           <li key={item.id}>
@@ -90,6 +98,7 @@ export default function SideNav({
               aria-current={item.id === activeId ? "page" : undefined}
               title={collapsed ? item.label : undefined}
               aria-label={collapsed ? item.label : undefined}
+              data-tooltip={collapsed ? item.label : undefined}
               onClick={() => onSelect?.(item.id)}
             >
               <span className="cf-sidenav__icon">{item.icon}</span>
@@ -105,6 +114,7 @@ export default function SideNav({
           aria-expanded={!collapsed}
           title={collapsed ? "Expand navigation" : "Collapse navigation"}
           aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+          data-tooltip={collapsed ? "Expand navigation" : undefined}
           onClick={toggleCollapsed}
         >
           <span className="cf-sidenav__icon">

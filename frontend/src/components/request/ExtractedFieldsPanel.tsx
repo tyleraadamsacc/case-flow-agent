@@ -103,6 +103,12 @@ export default function ExtractedFieldsPanel({
   const legalAuthorities = request.legal_authorities ?? [];
   const scopeAuthorityChecks = request.scope_authority_checks ?? [];
   const deficiencyFindings = request.deficiency_findings ?? [];
+  const sourceBackedIdentifiers = subjectIdentifiers.filter((identifier) =>
+    Boolean(identifier.source_span),
+  ).length;
+  const blockingDeficiencies = deficiencyFindings.filter(
+    (finding) => finding.severity === "blocking",
+  ).length;
   const [periodStart, setPeriodStart] = useState(
     period?.start ? period.start.slice(0, 10) : "",
   );
@@ -159,6 +165,24 @@ export default function ExtractedFieldsPanel({
 
   return (
     <Card title="Extracted fields" subtitle="Parsed from the source document">
+      <div className="cf-fields__summary" aria-label="Extraction summary">
+        <div>
+          <span>{subjectIdentifiers.length}</span>
+          <small>identifiers</small>
+        </div>
+        <div>
+          <span>{requestedDataCategories.length}</span>
+          <small>data categories</small>
+        </div>
+        <div>
+          <span>{sourceBackedIdentifiers}</span>
+          <small>source-backed IDs</small>
+        </div>
+        <div>
+          <span>{blockingDeficiencies}</span>
+          <small>blocking deficiencies</small>
+        </div>
+      </div>
       <div className="cf-fields">
         <Group label="Legal process">
           <Chip tone="blue">

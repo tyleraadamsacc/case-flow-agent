@@ -243,6 +243,18 @@ export default function SixAgentWorkflowRail({
           <Metric label="Blocking items" value={story.blockers} />
           <Metric label="Human actions" value={story.humanActions} />
           <Metric label="Last run" value={story.lastRun} />
+        </div>
+        <div className="cf-workflow-story__guardrails" aria-label="Workflow guardrails">
+          <Chip tone="blue">Draft</Chip>
+          <Chip tone="blue">Prepared</Chip>
+          <Chip tone="amber" dot>
+            Pending review
+          </Chip>
+          <Chip tone="amber" dot>
+            Human review required
+          </Chip>
+          <Chip tone="green">Audit event logged</Chip>
+          <Chip tone="violet">Synthetic / mock data</Chip>
           <Chip tone={story.changedSinceApproval ? "amber" : "neutral"} dot>
             {story.changedSinceApproval
               ? "Changed since approval"
@@ -283,16 +295,22 @@ export default function SixAgentWorkflowRail({
       </div>
 
       <div className={`cf-workflow-grid cf-workflow-grid--${reviewerMode}`}>
-        <ol className="cf-agent-timeline" aria-label="Six-Agent Workflow Rail">
-          {agents.map((agent) => (
-            <AgentTimelineNode
-              key={agent.agentId}
-              agent={agent}
-              selected={agent.agentId === selected.agentId}
-              onSelect={() => setSelectedAgentId(agent.agentId)}
-            />
-          ))}
-        </ol>
+        <div className="cf-agent-timeline-shell">
+          <div className="cf-agent-timeline-shell__header">
+            <span>Official sequence</span>
+            <strong>All six agents</strong>
+          </div>
+          <ol className="cf-agent-timeline" aria-label="Six-Agent Workflow Rail">
+            {agents.map((agent) => (
+              <AgentTimelineNode
+                key={agent.agentId}
+                agent={agent}
+                selected={agent.agentId === selected.agentId}
+                onSelect={() => setSelectedAgentId(agent.agentId)}
+              />
+            ))}
+          </ol>
+        </div>
 
         <article
           className="cf-agent-detail"
@@ -380,6 +398,7 @@ function AgentTimelineNode({
           <span className="cf-agent-node__meta">
             <span>{confidence}</span>
             <span>{agent.run?.evidenceIds?.length ?? 0} evidence</span>
+            <span>{agent.run?.auditAction ? "audit logged" : "audit pending"}</span>
             {agent.run?.requiresHumanReview ? <span>human gate</span> : null}
           </span>
         </span>
@@ -417,7 +436,7 @@ function AgentDetailPanel({
     <>
       <header className="cf-agent-detail__header">
         <div>
-          <p className="cf-agent-detail__eyebrow">Selected agent</p>
+          <p className="cf-agent-detail__eyebrow">Gemini analysis panel</p>
           <h3>{agent.theme.officialName}</h3>
           <p>{agent.theme.roleDescription}</p>
         </div>
@@ -452,6 +471,10 @@ function AgentDetailPanel({
         <TrustMetric
           label="Evidence"
           value={`${run?.evidenceIds?.length ?? 0} direct`}
+        />
+        <TrustMetric
+          label="Audit"
+          value={run?.auditAction ? "Audit event logged" : "Pending"}
         />
         <TrustMetric label="Risk" value={riskLabel(agent, riskItems)} />
         <TrustMetric label="Policy basis" value={policyBasis(run)} />
@@ -513,7 +536,7 @@ function AgentDetailPanel({
               </>
             ) : null}
             {agent.agentId === "automation_agent" ? (
-              <Chip tone="neutral">Finalize remains human-only</Chip>
+              <Chip tone="neutral">Approval recording remains human-only</Chip>
             ) : null}
           </div>
         </section>
@@ -1159,7 +1182,7 @@ function humanActionPhrase(
   if (humanActionCount(agents, undefined, finalizationStatus) > 0) {
     return "Human approval required";
   }
-  return "Ready for human finalization";
+  return "Ready for approval recording";
 }
 
 function riskLabel(agent: ConsoleAgent, riskItems: string[]): string {
