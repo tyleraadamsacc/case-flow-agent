@@ -7,6 +7,7 @@ VENV := backend/.venv
 
 .PHONY: install install-backend install-frontend dev-backend dev-frontend \
         test test-unit test-api test-golden test-frontend lint build-frontend \
+        docker-build \
         demo-scenario-a demo-reset
 
 install: install-backend install-frontend
@@ -39,6 +40,10 @@ test-golden:
 
 test-frontend:
 	cd frontend && npm test
+
+# Single container: API + built SPA, local mode, zero credentials.
+docker-build:
+	docker build -t caseflow-agent .
 
 lint:
 	cd backend && .venv/bin/ruff check app tests scripts

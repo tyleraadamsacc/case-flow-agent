@@ -32,6 +32,17 @@ class Settings(BaseSettings):
     # Per-task model id overrides, keyed by ModelRouter task name.
     model_overrides: dict[str, str] = {}
 
+    # GCP mode (CASEFLOW_APP_MODE=gcp) — adapter selection is config-only.
+    # All adapters are post-MVP skeletons; local mode never reads these.
+    gcp_project: str | None = None
+    firestore_collection_prefix: str = "caseflow"
+    gcs_bucket: str | None = None
+    agent_search_datastore: str | None = None
+
+    # When set (the container image sets it), the API also serves the
+    # built SPA from this directory.
+    static_dir: Path | None = None
+
     def model_for(self, task: str) -> str | None:
         """The configured model id for a task, or None if unconfigured."""
         return self.model_overrides.get(task) or self.model_default

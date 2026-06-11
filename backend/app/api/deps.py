@@ -41,13 +41,36 @@ class Container:
         self.settings = settings
         mock_dir = settings.mock_data_dir
 
-        self.legal_request_repository = LocalLegalRequestRepository()
-        self.audit_repository = LocalAuditRepository()
+        # Adapter selection is config-only (plan §19 PR 10): GCP mode
+        # swaps the persistence/retrieval adapters behind the same
+        # interfaces. The GCP adapters are post-MVP skeletons that fail
+        # with guidance; local mode (the default) needs zero credentials.
+        if settings.app_mode == "gcp":
+            from app.repositories.firestore_audit_repository import (
+                FirestoreAuditRepository,
+            )
+            from app.repositories.firestore_legal_request_repository import (
+                FirestoreLegalRequestRepository,
+            )
+            from app.repositories.gcs_storage_repository import GcsStorageRepository
+
+            self.legal_request_repository = FirestoreLegalRequestRepository(
+                project=settings.gcp_project,
+                collection_prefix=settings.firestore_collection_prefix,
+            )
+            self.audit_repository = FirestoreAuditRepository(
+                project=settings.gcp_project,
+                collection_prefix=settings.firestore_collection_prefix,
+            )
+            self.storage_repository = GcsStorageRepository(bucket=settings.gcs_bucket)
+        else:
+            self.legal_request_repository = LocalLegalRequestRepository()
+            self.audit_repository = LocalAuditRepository()
+            self.storage_repository = LocalStorageRepository(mock_dir)
         self.agent_run_repository = LocalAgentRunRepository()
         self.response_record_repository = LocalResponseRecordRepository(
             mock_dir / "response_records"
         )
-        self.storage_repository = LocalStorageRepository(mock_dir)
 
         self.audit_service = AuditService(self.audit_repository)
         self.state_machine = WorkflowStateMachine()
@@ -57,7 +80,16 @@ class Container:
             mock_dir / "sop" / "special_handling_rules.json"
         )
         self.deficiency_service = DeficiencyService(mock_dir / "sop" / "deficiency_rules.json")
-        self.retrieval_service = LocalSopRetrievalService(mock_dir)
+        if settings.app_mode == "gcp" and settings.agent_search_datastore:
+            from app.services.agent_search_retrieval_service import (
+                AgentSearchRetrievalService,
+            )
+
+            self.retrieval_service = AgentSearchRetrievalService(
+                datastore=settings.agent_search_datastore
+            )
+        else:
+            self.retrieval_service = LocalSopRetrievalService(mock_dir)
         self.governance_service = GovernanceMetricsService(
             self.legal_request_repository,
             self.audit_repository,
