@@ -17,6 +17,7 @@ from app.adk_agents.base import CaseFlowAgent
 from app.adk_agents.registry import ETL_AGENT, OFFICIAL_AGENT_NAMES, TRIAGING_AGENT
 from app.adk_agents.shared import (
     blocking_deficiencies,
+    has_human_approval,
     is_overbroad,
     request_input_summary,
     sme_reasons_present,
@@ -58,8 +59,9 @@ class EtlAgent(CaseFlowAgent):
                 risk_flags=["blocking_deficiency"],
             )
 
+        approved = has_human_approval(request)
         sme_reasons = sme_reasons_present(triaging_draft.review_reasons)
-        if sme_reasons:
+        if sme_reasons and not approved:
             return self.blocked(
                 "sme_escalation_pending",
                 output_summary=(
@@ -71,7 +73,7 @@ class EtlAgent(CaseFlowAgent):
                 risk_flags=["sme_escalation_pending"],
             )
 
-        if is_overbroad(request):
+        if is_overbroad(request) and not approved:
             return self.blocked(
                 "overbroad_scope_pending_review",
                 output_summary=(

@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     seed_on_startup: bool = True
     mock_data_dir: Path = _DEFAULT_MOCK_DATA_DIR
+    # "demo" seeds only the two-document LERS scenario (the UI dataset);
+    # "full" seeds the eight test scenarios. Tests run "full".
+    seed_dataset: str = "full"  # full | demo
 
     # Gemini mode only — never required locally. The API key is read from
     # the environment and must never be committed.

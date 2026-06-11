@@ -87,7 +87,7 @@ describe("RequestDetailPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("offers exactly the four human review actions and no agent-side approval", async () => {
+  it("offers the five human review actions and no agent-side approval", async () => {
     vi.spyOn(api, "getLegalRequest").mockResolvedValue(makeLegalRequest());
     vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
 
@@ -104,6 +104,9 @@ describe("RequestDetailPage", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Send to QA" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Finalize request" }),
     ).toBeInTheDocument();
     expect(
       screen.getByText("All decisions are made by a person"),

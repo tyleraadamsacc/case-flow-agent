@@ -19,6 +19,7 @@ from app.llm.model_assist import ModelAssist
 from app.adk_agents.registry import ETL_AGENT, OFFICIAL_AGENT_NAMES, TEXT_CONTENT_AGENT
 from app.adk_agents.shared import (
     blocking_deficiencies,
+    has_human_approval,
     is_overbroad,
     request_input_summary,
     sme_reasons_present,
@@ -152,9 +153,12 @@ class TextContentAgent(CaseFlowAgent):
             return DraftType(requested)
         if blocking_deficiencies(request):
             return DraftType.DEFICIENCY_RESPONSE
-        if sme_reasons_present([reason.value for reason in classification.review_reasons]):
+        approved = has_human_approval(request)
+        if not approved and sme_reasons_present(
+            [reason.value for reason in classification.review_reasons]
+        ):
             return DraftType.SME_NOTIFICATION
-        if is_overbroad(request):
+        if is_overbroad(request) and not approved:
             # Overbroad scope is answered with a clarification/narrowing
             # request, modeled as a deficiency response.
             return DraftType.DEFICIENCY_RESPONSE

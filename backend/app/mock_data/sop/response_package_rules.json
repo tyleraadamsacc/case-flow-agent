@@ -1,4 +1,5 @@
 {
+  "_source": "Wording taken verbatim from mock_data/source_documents/Template LERS Response.docx (synthetic template). Statuses remain pending-human by type constraint regardless of wording.",
   "evidence_ids": {
     "production_package": "TMPL-LERS-RESPONSE",
     "no_responsive_records": "TMPL-NO-RESPONSIVE-RECORDS",
@@ -6,17 +7,17 @@
     "deficiency_response": "TMPL-DEFICIENCY-RESPONSE",
     "sme_notification": "TMPL-SME-NOTIFICATION"
   },
-  "header_template": "Google LLC — Legal Investigations Support (LERS) Response. DRAFT — pending analyst approval. SYNTHETIC DATA. Production ID: {production_id}. Request: {legal_request_id}. Date produced: {date_produced}.",
-  "ordinary_course_statement": "The records identified below were retrieved from a synthetic mock record store for prototype demonstration. In production they would be records made and kept in the ordinary course of business.",
-  "no_responsive_records_statement": "A diligent search of the synthetic mock record store identified no records responsive to the request for the specified identifiers and requested period.",
+  "header_template": "LAW ENFORCEMENT RESPONSE PACKAGE — DRAFT, pending analyst approval (SYNTHETIC DATA). Request ID: {legal_request_id} · Production ID: {production_id} · Date Produced: {date_produced}.",
+  "production_summary_intro": "The Company has identified responsive GPS location records associated with the account listed above for the requested period.",
+  "ordinary_course_statement": "The enclosed records are produced pursuant to the legal process identified above and reflect information maintained in the ordinary course of business.",
+  "no_responsive_records_statement": "A diligent search identified no records responsive to the request for the specified identifiers and requested period. (Synthetic mock store — no production system queried.)",
   "field_definitions": {
     "gps": [
-      {"name": "record_id", "definition": "Stable identifier of the synthetic record."},
-      {"name": "timestamp_utc", "definition": "UTC timestamp at which the synthetic location fix was recorded."},
-      {"name": "latitude", "definition": "Latitude of the synthetic location fix in decimal degrees (WGS84)."},
-      {"name": "longitude", "definition": "Longitude of the synthetic location fix in decimal degrees (WGS84)."},
-      {"name": "accuracy_meters", "definition": "Estimated horizontal accuracy radius of the fix, in meters."},
-      {"name": "source", "definition": "Synthetic source signal of the fix (gps, wifi, cell)."}
+      {"name": "timestamp_utc", "definition": "Date and time when the location record was generated."},
+      {"name": "latitude", "definition": "North/South geographic coordinate in decimal degrees."},
+      {"name": "longitude", "definition": "East/West geographic coordinate in decimal degrees."},
+      {"name": "accuracy_meters", "definition": "Estimated radius of accuracy associated with the recorded coordinate."},
+      {"name": "source", "definition": "System that generated the location event."}
     ],
     "subscriber": [
       {"name": "record_id", "definition": "Stable identifier of the synthetic record."},
@@ -25,12 +26,13 @@
     ]
   },
   "chain_of_custody_template": {
-    "collection_method": "Deterministic mock export from the synthetic record store (no production system queried)",
-    "collected_by": "ETL Agent (synthetic mock run)"
+    "collection_method": "Internal Location Data Repository Query (synthetic mock store)",
+    "collected_by": "Legal Response Operations Team"
   },
   "certification_template": {
-    "title": "Custodian of Records (draft)",
-    "certification_text": "DRAFT CERTIFICATION — pending human approval. I certify that the attached synthetic records are true and accurate copies of records retrieved from the prototype mock record store. SYNTHETIC DATA — NOT A REAL CERTIFICATION."
+    "authorized_representative": "Jane Doe",
+    "title": "Legal Operations Analyst",
+    "certification_text": "I certify that the attached records were retrieved from systems maintained in the ordinary course of business and are true copies of records responsive to the legal process identified above. (DRAFT — synthetic data; pending human approval.)"
   },
   "deficiency_response_template": "DRAFT clarification to the requesting agency — pending human approval. The request as received cannot proceed to retrieval because of the deficiencies listed below. No records will be searched or produced until the deficiencies are resolved and a human analyst approves the next step.",
   "sme_notification_template": "DRAFT SME notification — pending human approval. The request below carries special-handling requirements that require subject-matter-expert review before any retrieval or response step. No automated action has been taken."

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from fastapi import Request
 
 from app.config import Settings
-from app.mock_data.seed import seed_legal_requests
+from app.mock_data.seed import fixtures_dir, seed_legal_requests
 from app.models.enums import ActorType
 from app.llm.model_assist import ModelAssist
 from app.llm.model_router import ModelRouter
@@ -75,7 +75,9 @@ class Container:
         self.audit_service = AuditService(self.audit_repository)
         self.state_machine = WorkflowStateMachine()
         self.approval_policy = ApprovalPolicy()
-        self.extraction_service = RequestExtractionService(mock_dir / "legal_requests")
+        self.extraction_service = RequestExtractionService(
+            fixtures_dir(mock_dir, settings.seed_dataset)
+        )
         self.special_handling_service = SensitiveSpecialHandlingService(
             mock_dir / "sop" / "special_handling_rules.json"
         )
@@ -115,7 +117,10 @@ class Container:
 
     def seed(self) -> int:
         return seed_legal_requests(
-            self.legal_request_repository, self.audit_service, self.settings.mock_data_dir
+            self.legal_request_repository,
+            self.audit_service,
+            self.settings.mock_data_dir,
+            dataset=self.settings.seed_dataset,
         )
 
 

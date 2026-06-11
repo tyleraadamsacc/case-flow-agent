@@ -20,8 +20,10 @@ install-backend:
 install-frontend:
 	cd frontend && npm install
 
+# The dev/demo server seeds ONLY the two-document LERS scenario
+# (mock_data/source_documents). Tests keep the full eight-scenario corpus.
 dev-backend:
-	cd backend && .venv/bin/uvicorn app.main:app --reload --port 8000
+	cd backend && CASEFLOW_SEED_DATASET=demo .venv/bin/uvicorn app.main:app --reload --port 8000
 
 dev-frontend:
 	cd frontend && npm run dev
