@@ -15,7 +15,13 @@
   line-height: 1;
   padding: 10px 20px;
   cursor: pointer;
-  transition: background var(--motion-fast), box-shadow var(--motion-fast);
+  transition: background var(--motion-fast), box-shadow var(--motion-fast),
+    transform var(--motion-fast);
+}
+
+/* Tactile press: a 1px nudge, nothing springy. */
+.cf-button:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .cf-button--sm {
@@ -418,6 +424,20 @@ button.cf-chip {
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+/* A quiet gradient hairline under the app bar — the one app-wide Gemini
+   accent besides the brand mark. */
+.cf-topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--gemini-gradient);
+  opacity: 0.35;
+  pointer-events: none;
 }
 
 .cf-topbar__brand {
@@ -880,7 +900,9 @@ button.cf-chip {
 
 .cf-queue__row {
   display: grid;
-  grid-template-columns: 150px minmax(200px, 1.4fr) minmax(220px, 1.6fr) auto 170px;
+  grid-template-columns:
+    140px minmax(180px, 1.2fr) minmax(200px, 1.5fr) 104px auto
+    minmax(130px, 160px);
   align-items: center;
   gap: var(--space-3);
   width: 100%;
@@ -947,6 +969,7 @@ button.cf-chip {
   }
 
   .cf-queue__chips,
+  .cf-queue__minirail,
   .cf-queue__next {
     display: none;
   }
@@ -1263,7 +1286,14 @@ button.cf-chip {
   display: block;
   font-size: var(--font-display);
   font-weight: 500;
-  margin-bottom: var(--space-2);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: var(--space-1);
+}
+
+.cf-metric__caption {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-small);
+  color: var(--text-secondary);
 }
 
 .cf-governance-grid {
@@ -1432,7 +1462,32 @@ select.cf-input {
   position: relative;
   display: flex;
   gap: var(--space-3);
-  padding: var(--space-3) 0 var(--space-3) var(--space-1);
+  padding: var(--space-3) var(--space-2) var(--space-3) var(--space-1);
+  border-radius: var(--radius-md);
+  transition: background var(--motion-fast);
+}
+
+.cf-timeline__event:hover {
+  background: var(--surface-soft);
+}
+
+/* Day separator inside the timeline list. */
+.cf-timeline__day {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0 var(--space-1);
+  font-size: var(--font-small);
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.cf-timeline__day::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
 }
 
 .cf-timeline__event:not(:last-child)::before {
@@ -1453,6 +1508,20 @@ select.cf-input {
   border-radius: 50%;
   background: var(--blue);
   opacity: 0.7;
+}
+
+/* Actor-toned dots: who acted is readable at a glance down the spine.
+   Agent events carry the agent's accent via inline style. */
+.cf-timeline__dot--human {
+  background: var(--blue);
+}
+
+.cf-timeline__dot--service {
+  background: var(--violet);
+}
+
+.cf-timeline__dot--system {
+  background: var(--text-muted);
 }
 
 .cf-timeline__body {
@@ -1586,4 +1655,344 @@ select.cf-input {
   margin: var(--space-3) 0 0;
   font-size: var(--font-small);
   color: var(--text-muted);
+}
+
+/* ---------- Hero panel ---------- */
+
+/* Page-level hero: a bright card with the gemini wash bleeding in from
+   the top edge. The wash is atmosphere, not decoration — content sits on
+   plain surface. */
+.cf-hero {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+
+.cf-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--gemini-wash);
+  pointer-events: none;
+}
+
+.cf-hero > * {
+  position: relative;
+}
+
+.cf-hero__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3) var(--space-4);
+  margin: var(--space-4) 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cf-fact {
+  min-width: 0;
+}
+
+.cf-fact__label {
+  margin: 0 0 2px;
+  font-size: var(--font-micro);
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.cf-fact__value {
+  font-size: var(--font-body);
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Workflow progress ---------- */
+
+/* The request's journey in one line: done, current, upcoming. The
+   current step carries the gradient node — the same "live" signal the
+   rail uses for running agents. */
+.cf-flow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) 0;
+}
+
+.cf-flow__step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-right: var(--space-6);
+  font-size: var(--font-small);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.cf-flow__step:last-child {
+  padding-right: 0;
+}
+
+.cf-flow__step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  right: var(--space-2);
+  top: 50%;
+  width: var(--space-3);
+  height: 2px;
+  background: var(--border-subtle);
+}
+
+.cf-flow__node {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--surface-track);
+}
+
+.cf-flow__step--done {
+  color: var(--text-secondary);
+}
+
+.cf-flow__step--done .cf-flow__node {
+  background: var(--blue);
+}
+
+.cf-flow__step--current {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.cf-flow__step--current .cf-flow__node {
+  background: var(--gemini-gradient);
+  box-shadow: 0 0 0 3px var(--blue-soft);
+}
+
+/* ---------- Queue pulse strip ---------- */
+
+/* Clickable state summaries above the queue: each tile is a filter.
+   The pressed tile carries the tint that elsewhere marks the active
+   nav destination. */
+.cf-pulse-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.cf-pulse {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  font-family: inherit;
+  background: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  transition: box-shadow var(--motion-standard), border-color var(--motion-fast),
+    background var(--motion-fast);
+}
+
+.cf-pulse:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+
+.cf-pulse[aria-pressed="true"] {
+  background: var(--surface-tint-blue);
+  border-color: var(--blue);
+}
+
+.cf-pulse__value {
+  font-size: var(--font-title);
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.cf-pulse__label {
+  font-size: var(--font-small);
+  color: var(--text-secondary);
+}
+
+/* ---------- Six-agent mini rail ---------- */
+
+/* One segment per agent in rail order; status comes from the latest run.
+   Waiting segments stay visible so the rail always reads as six. */
+.cf-minirail {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.cf-minirail__seg {
+  width: 13px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-track);
+}
+
+.cf-minirail__seg--complete {
+  background: var(--green);
+}
+
+.cf-minirail__seg--running {
+  background: var(--gemini-gradient);
+}
+
+.cf-minirail__seg--needs_review {
+  background: var(--yellow);
+}
+
+.cf-minirail__seg--blocked,
+.cf-minirail__seg--failed {
+  background: var(--red);
+}
+
+/* ---------- RFP agent coverage cards ---------- */
+
+/* Six agent-ops tiles in the rail's 3x2 shape — governance mirrors the
+   workflow geometry the analyst already knows. */
+.cf-coverage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+@media (max-width: 1200px) {
+  .cf-coverage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .cf-coverage-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cf-coverage-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--surface-soft);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  min-width: 0;
+}
+
+.cf-coverage-card__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.cf-coverage-card__name {
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+}
+
+.cf-coverage-card__stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-5);
+  margin: 0;
+}
+
+.cf-coverage-card__stats > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.cf-coverage-card__stats dt {
+  font-size: var(--font-micro);
+  font-weight: 500;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.cf-coverage-card__stats dd {
+  margin: 0;
+  font-size: var(--font-section);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cf-coverage-card__flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* ---------- Loading skeleton ---------- */
+
+/* Row-shaped placeholders so loading looks like the layout it becomes.
+   The shimmer collapses to a still tint under reduced motion. */
+.cf-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.cf-skeleton__row {
+  height: 58px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    90deg,
+    var(--surface-soft) 25%,
+    #e9edf5 50%,
+    var(--surface-soft) 75%
+  );
+  background-size: 200% 100%;
+  animation: cf-skeleton 1.4s ease-in-out infinite;
+}
+
+.cf-skeleton__row--short {
+  height: 34px;
+  max-width: 460px;
+}
+
+@keyframes cf-skeleton {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ---------- Empty state ---------- */
+
+.cf-empty {
+  text-align: center;
+  padding: var(--space-10) var(--space-6);
+}
+
+.cf-empty > h3 {
+  font-size: var(--font-section);
+  margin-bottom: var(--space-1);
+}
+
+.cf-empty > p {
+  color: var(--text-secondary);
+  margin: 0 auto;
+  max-width: 440px;
 }
