@@ -462,8 +462,7 @@ button.cf-chip {
   z-index: 10;
 }
 
-/* A quiet gradient hairline under the app bar — the one app-wide Gemini
-   accent besides the brand mark. */
+/* A quiet gradient hairline under the app bar. */
 .cf-topbar::after {
   content: "";
   position: absolute;
@@ -483,15 +482,6 @@ button.cf-chip {
   font-size: var(--font-section);
   font-weight: 500;
   white-space: nowrap;
-}
-
-.cf-topbar__brand-mark {
-  width: 16px;
-  height: 16px;
-  border-radius: 6px;
-  background: var(--gemini-gradient);
-  flex: none;
-  box-shadow: 0 0 0 4px rgba(26, 115, 232, 0.08);
 }
 
 .cf-topbar__divider {
@@ -2442,7 +2432,7 @@ select.cf-input {
 
 .cf-queue-demo__steps {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--space-1);
 }
 
@@ -2495,6 +2485,39 @@ select.cf-input {
 .cf-queue__chips {
   justify-content: flex-end;
   flex: 1 1 320px;
+}
+
+.cf-queue__next-action {
+  display: grid;
+  flex: 1.2 1 360px;
+  gap: 3px;
+  min-width: 260px;
+  max-width: 560px;
+  padding: 10px 12px;
+  border: 1px solid rgba(26, 115, 232, 0.16);
+  border-radius: var(--radius-md);
+  background: var(--surface-tint-blue);
+}
+
+.cf-queue__next-action > span {
+  color: var(--text-muted);
+  font-size: var(--font-micro);
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.cf-queue__next-action strong {
+  color: var(--text-primary);
+  font-size: var(--font-body);
+  font-weight: 680;
+  line-height: 1.25;
+}
+
+.cf-queue__next-action small {
+  color: var(--text-secondary);
+  font-size: var(--font-small);
+  line-height: 1.35;
 }
 
 .cf-queue__workflow {
@@ -2587,6 +2610,10 @@ select.cf-input {
 @media (max-width: 680px) {
   .cf-queue__body {
     flex-direction: column;
+  }
+
+  .cf-queue__next-action {
+    max-width: none;
   }
 
   .cf-queue__chips {

@@ -49,7 +49,7 @@ const AUDIT_EVENT: AuditEvent = {
 afterEach(() => vi.restoreAllMocks());
 
 describe("RequestDetailPage", () => {
-  it("renders a tabbed request command center with Overview selected by default", async () => {
+  it("renders a guided request command center with the active next step selected", async () => {
     vi.spyOn(api, "getLegalRequest").mockResolvedValue(makeLegalRequest());
     vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
 
@@ -57,15 +57,19 @@ describe("RequestDetailPage", () => {
 
     expect(await screen.findByRole("heading", { name: "LER-2026-004812" }))
       .toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+    expect(screen.getAllByText("Next required action").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Run six-agent workflow").length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("list", { name: "Guided request steps" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Agent outputs" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    expect(screen.getByRole("tab", { name: "Evidence" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Agents" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Drafts" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Audit" })).toBeInTheDocument();
-    expect(screen.getByText("Review focus")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Review brief" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Evidence & fields" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Draft package" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Audit trail" })).toBeInTheDocument();
   });
 
   it("switches tabs to show evidence and agent workspaces", async () => {
@@ -74,17 +78,39 @@ describe("RequestDetailPage", () => {
 
     renderDetail("LER-2026-004812");
 
-    fireEvent.click(await screen.findByRole("tab", { name: "Evidence" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Evidence & fields" }));
+    expect(screen.getByRole("tab", { name: "Evidence & fields" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(
       await screen.findByRole("document", {
         name: "Source request document sections",
       }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Agents" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Agent outputs" }));
+    expect(screen.getByRole("tab", { name: "Agent outputs" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(
       await screen.findByRole("list", { name: "Six-Agent Workflow Rail" }),
     ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Draft package" }));
+    expect(screen.getByRole("tab", { name: "Draft package" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(await screen.findByText(/No drafts yet/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Audit trail" }));
+    expect(screen.getByRole("tab", { name: "Audit trail" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(await screen.findByText("No audit events yet.")).toBeInTheDocument();
   });
 
   it("renders the rail with all six official agents and live run data", async () => {
@@ -107,7 +133,7 @@ describe("RequestDetailPage", () => {
 
     renderDetail(request.legal_request_id);
 
-    fireEvent.click(await screen.findByRole("tab", { name: "Agents" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Agent outputs" }));
 
     const rail = await screen.findByRole("list", {
       name: "Six-Agent Workflow Rail",
@@ -118,8 +144,8 @@ describe("RequestDetailPage", () => {
     // Live run data flows onto the cards; agents without runs are waiting.
     expect(within(rail).getByText("Labeled the request.")).toBeInTheDocument();
     expect(
-      screen.getByText(/Missing date range blocks mock retrieval\./),
-    ).toBeInTheDocument();
+      screen.getAllByText(/Missing date range blocks mock retrieval\./).length,
+    ).toBeGreaterThan(0);
     expect(within(rail).getAllByText("Waiting")).toHaveLength(4);
     // The audit inspector resolves the event id to its action name when
     // the reviewer switches into QA mode for audit-focused review.
@@ -238,7 +264,7 @@ describe("RequestDetailPage", () => {
 
     renderDetail(request.legal_request_id);
 
-    fireEvent.click(await screen.findByRole("tab", { name: "Evidence" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Evidence & fields" }));
 
     const doc = await screen.findByRole("document", {
       name: "Source request document sections",
@@ -283,7 +309,7 @@ describe("RequestDetailPage", () => {
 
     renderDetail("LER-2026-004812");
 
-    fireEvent.click(await screen.findByRole("tab", { name: "Evidence" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Evidence & fields" }));
 
     const doc = await screen.findByRole("document", {
       name: "Source request document sections",
@@ -330,7 +356,7 @@ describe("RequestDetailPage", () => {
 
     renderDetail("LER-2026-004812");
 
-    fireEvent.click(await screen.findByRole("tab", { name: "Evidence" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Evidence & fields" }));
 
     expect(await screen.findByText("Account id: ACC-NO-EVIDENCE")).toHaveAttribute(
       "title",
@@ -349,7 +375,7 @@ describe("RequestDetailPage", () => {
 
     renderDetail("LER-2026-004812");
 
-    fireEvent.click(await screen.findByRole("tab", { name: "Drafts" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Draft package" }));
 
     expect(
       await screen.findByText("PROD-LER-2026-004812-01"),
@@ -390,7 +416,7 @@ describe("RequestDetailPage", () => {
 
     renderDetail("LER-2026-004812");
 
-    fireEvent.click(await screen.findByRole("tab", { name: "Drafts" }));
+    fireEvent.click(await screen.findByRole("tab", { name: "Draft package" }));
 
     const draftButton = await screen.findByRole("button", {
       name: "Draft response package",
@@ -399,5 +425,43 @@ describe("RequestDetailPage", () => {
     expect(
       screen.getByText("Package drafting blocked by deficiency"),
     ).toBeInTheDocument();
+  });
+
+  it("uses guided shortcuts to open supporting workspaces", async () => {
+    vi.spyOn(api, "getLegalRequest").mockResolvedValue(makeLegalRequest());
+    vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
+
+    renderDetail("LER-2026-004812");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Evidence & fields" }));
+    expect(screen.getByRole("tab", { name: "Evidence & fields" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      await screen.findByRole("document", {
+        name: "Source request document sections",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Agent outputs" }));
+    expect(screen.getByRole("tab", { name: "Agent outputs" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("exposes stable accessibility labels for the guided request workspace", async () => {
+    vi.spyOn(api, "getLegalRequest").mockResolvedValue(makeLegalRequest());
+    vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
+
+    renderDetail("LER-2026-004812");
+
+    expect(await screen.findByLabelText("Request actions")).toBeInTheDocument();
+    expect(screen.getByLabelText("Request readiness summary")).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Request sections" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Request review workspace")).toBeInTheDocument();
+    expect(screen.getByLabelText("Human review panel")).toBeInTheDocument();
+    expect(screen.getByLabelText("Current step checklist")).toBeInTheDocument();
   });
 });

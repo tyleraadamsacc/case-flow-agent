@@ -8,6 +8,7 @@ import ConsoleShell from "../components/layout/ConsoleShell";
 import Card from "../components/ui/Card";
 import Chip from "../components/ui/Chip";
 import StatusBadge from "../components/ui/StatusBadge";
+import { buildRequestGuidance } from "../lib/requestGuidance";
 import {
   agencyName,
   auditStatusLabel,
@@ -15,7 +16,6 @@ import {
   formatDate,
   humanizeToken,
   legalProcessLabel,
-  nextAction,
   reviewRequirementLabel,
   specialHandlingBadges,
   workflowStateLabel,
@@ -72,7 +72,7 @@ const PULSE_TILES: Array<{ id: QueueFilter; label: string }> = [
   { id: "all", label: "All requests" },
   { id: "intake", label: "New intake" },
   { id: "agents", label: "Agent workflow" },
-  { id: "review", label: "Human decision" },
+  { id: "review", label: "Ready for decision" },
   { id: "blocked", label: "Blocked" },
   { id: "finalized", label: "Review recorded" },
 ];
@@ -255,16 +255,17 @@ export default function RequestQueuePage() {
             ))}
           </div>
           <Card variant="soft" className="cf-queue-demo">
-            <span className="cf-queue-demo__eyebrow">Demo walkthrough</span>
-            <h2>From intake to human decision</h2>
+            <span className="cf-queue-demo__eyebrow">Guided processing path</span>
+            <h2>Resume the next required step</h2>
             <p>
-              Open a request to inspect the extracted legal process, six-agent
-              outputs, draft package, and audit trail. Agents prepare evidence;
-              analysts decide what moves forward.
+              Open a request to land on its active review step. Agents prepare
+              evidence and drafts; analysts record every route, QA, and approval
+              decision.
             </p>
             <div className="cf-queue-demo__steps" aria-label="Workflow walkthrough">
               <span>Intake</span>
-              <span>Agent checks</span>
+              <span>Evidence</span>
+              <span>Agent review</span>
               <span>Human review</span>
               <span>Audit-ready</span>
             </div>
@@ -325,17 +326,23 @@ export default function RequestQueuePage() {
           const blocking = blockingDeficiencyCount(request);
           const runs =
             runsByRequest[request.legal_request_id] ?? request.agent_runs;
+          const guidedRequest: LegalRequest = { ...request, agent_runs: runs };
+          const guidance = buildRequestGuidance({ request: guidedRequest });
           const riskLabels = requestRiskLabels(request);
           return (
             <button
               key={request.legal_request_id}
               type="button"
+              aria-label={`Open request ${request.legal_request_id}. Next required action ${guidance.nextRequiredAction}. ${guidance.queueSummary}.`}
               className="cf-queue__row"
               onClick={() => navigate(`/requests/${request.legal_request_id}`)}
             >
               <span className="cf-queue__topline">
                 <span className="cf-queue__id">{request.legal_request_id}</span>
                 <StatusBadge status={request.workflow_state} />
+                <Chip tone={guidance.currentStepStatus === "blocked" ? "red" : "blue"} dot>
+                  {guidance.queueSummary}
+                </Chip>
                 <Chip tone="neutral" dot>
                   Synthetic / mock
                 </Chip>
@@ -348,6 +355,12 @@ export default function RequestQueuePage() {
                     {legalProcessLabel(request)} · received{" "}
                     {formatDate(request.date_received)}
                   </span>
+                </span>
+
+                <span className="cf-queue__next-action">
+                  <span>Next required action</span>
+                  <strong>{guidance.nextRequiredAction}</strong>
+                  <small>{guidance.nextActionReason}</small>
                 </span>
 
                 <span className="cf-queue__chips">
@@ -389,8 +402,8 @@ export default function RequestQueuePage() {
 
               <span className="cf-queue__workflow">
                 <span className="cf-queue__metric">
-                  <span className="cf-queue__label">Workflow state</span>
-                  <span>{workflowStateLabel(request.workflow_state)}</span>
+                  <span className="cf-queue__label">Next required action</span>
+                  <span>{guidance.nextRequiredAction}</span>
                 </span>
                 <span className="cf-queue__metric">
                   <span className="cf-queue__label">Six-agent preview</span>
@@ -400,8 +413,8 @@ export default function RequestQueuePage() {
                   </span>
                 </span>
                 <span className="cf-queue__metric">
-                  <span className="cf-queue__label">Next human action</span>
-                  <span>{nextAction(request.workflow_state)}</span>
+                  <span className="cf-queue__label">Workflow state</span>
+                  <span>{workflowStateLabel(request.workflow_state)}</span>
                 </span>
                 <span className="cf-queue__metric">
                   <span className="cf-queue__label">Review requirement</span>

@@ -17,9 +17,8 @@ export interface TopBarProps {
   actions?: ReactNode;
 }
 
-/** App bar: gradient brand mark, product name, page title, and a
- * persistent synthetic-data badge — every screen declares its data is
- * synthetic (plan §13). */
+/** App bar: product name, page title, and a persistent synthetic-data badge —
+ * every screen declares its data is synthetic (plan §13). */
 export default function TopBar({ title, actions }: TopBarProps) {
   const actorContext = useOptionalActor();
   const [fallbackActor, setFallbackActor] = useState(() => getActor());
@@ -40,10 +39,7 @@ export default function TopBar({ title, actions }: TopBarProps) {
 
   return (
     <header className="cf-topbar">
-      <span className="cf-topbar__brand">
-        <span className="cf-topbar__brand-mark" aria-hidden="true" />
-        CaseFlow
-      </span>
+      <span className="cf-topbar__brand">CaseFlow</span>
       {title ? (
         <>
           <span className="cf-topbar__divider" aria-hidden="true" />
