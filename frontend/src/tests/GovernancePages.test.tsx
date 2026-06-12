@@ -1,50 +1,17 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { governanceApi } from "../api/client";
-import type {
-  AgentActivity,
-  AuditEvent,
-  GovernanceMetric,
-} from "../api/types";
+import { lisIrtDashboardApi } from "../api/lisIrtDashboard";
+import type { AuditEvent } from "../api/types";
+import { buildLisIrtDashboard } from "../mocks/lisIrtDashboardMock";
 import AuditPage from "../pages/AuditPage";
 import GovernanceInsightsPage from "../pages/GovernanceInsightsPage";
 import WorkNeedingAttentionPage from "../pages/WorkNeedingAttentionPage";
 import { AGENT_RAIL_ORDER, AGENT_THEME } from "../theme/agentTheme";
 
 const OFFICIAL_NAMES = AGENT_RAIL_ORDER.map((id) => AGENT_THEME[id].officialName);
-
-function metric(overrides: Partial<GovernanceMetric>): GovernanceMetric {
-  return {
-    metric_id: "metric:test",
-    title: "Test metric",
-    value: 1,
-    unit: "count",
-    dimension: null,
-    period: null,
-    data_confidence: "synthetic_mock",
-    evidence_ids: [],
-    ...overrides,
-  };
-}
-
-function activity(overrides: Partial<AgentActivity>): AgentActivity {
-  return {
-    agent_id: "indexing_agent",
-    agent_name: "Indexing Agent",
-    runs_total: 3,
-    runs_completed: 3,
-    runs_blocked: 0,
-    runs_needs_review: 0,
-    runs_failed: 0,
-    audit_events: 3,
-    average_confidence: 0.93,
-    requests_covered: ["LER-2026-004812"],
-    data_confidence: "fully_tracked",
-    ...overrides,
-  };
-}
 
 const AUDIT_EVENT: AuditEvent = {
   audit_event_id: "evt_g1",
@@ -65,43 +32,10 @@ const AUDIT_EVENT: AuditEvent = {
 afterEach(() => vi.restoreAllMocks());
 
 describe("GovernanceInsightsPage", () => {
-  it("renders the RFP Agent Coverage module with all six official agents", async () => {
-    vi.spyOn(governanceApi, "summary").mockResolvedValue({
-      metrics: [metric({ metric_id: "metric:backlog", title: "Open backlog", value: 7 })],
-    });
-    vi.spyOn(governanceApi, "agentActivity").mockResolvedValue({
-      agents: AGENT_RAIL_ORDER.map((id) =>
-        activity({ agent_id: id, agent_name: AGENT_THEME[id].officialName }),
-      ),
-    });
-    vi.spyOn(governanceApi, "productVolume").mockResolvedValue({
-      metrics: [
-        metric({
-          metric_id: "product_volume:Maps / Location",
-          title: "Requests touching Maps / Location",
-          dimension: "product_domain",
-          value: 5,
-        }),
-      ],
-    });
-    vi.spyOn(governanceApi, "processingTimeByProduct").mockResolvedValue({
-      metrics: [],
-    });
-    vi.spyOn(governanceApi, "bottlenecks").mockResolvedValue({ metrics: [] });
-    vi.spyOn(governanceApi, "responsePackageStatus").mockResolvedValue({
-      metrics: [],
-    });
-    vi.spyOn(governanceApi, "auditReadiness").mockResolvedValue({
-      requests_total: 8,
-      requests_with_all_required_events: 1,
-      coverage_percent: 12.5,
-      missing_events_by_request: {},
-      finalization_blocked_events: 0,
-      data_confidence: "fully_tracked",
-    });
-    vi.spyOn(governanceApi, "workNeedingAttention").mockResolvedValue({
-      items: [],
-    });
+  it("renders Trends by default and keeps Overview available for KPIs and attention preview", async () => {
+    vi.spyOn(lisIrtDashboardApi, "getDashboard").mockResolvedValue(
+      buildLisIrtDashboard(),
+    );
 
     render(
       <MemoryRouter>
@@ -109,47 +43,40 @@ describe("GovernanceInsightsPage", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("RFP Agent Coverage")).toBeInTheDocument();
-    for (const name of OFFICIAL_NAMES) {
-      expect(screen.getByText(name)).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", {
+        name: "LIS / IRT Vendor Analytics",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Trends" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    for (const tab of ["Overview", "Workload", "People", "Attention"]) {
+      expect(screen.getByRole("tab", { name: tab })).toBeInTheDocument();
     }
-    // Data confidence is labeled, and the metric strip renders.
-    expect(screen.getByText("Open backlog")).toBeInTheDocument();
-    expect(screen.getAllByText("Synthetic / mock").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Executive view of request volume/)).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Median TAT trend" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Backlog and risk trend" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Overview" }));
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: /Volume In: 8,532/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Volume Out: 8,478/ })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Volume in versus volume out trend" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "SLO compliance trend" })).toBeInTheDocument();
+    expect(screen.getByText("Attention Preview")).toBeInTheDocument();
+    expect(screen.getAllByText("Emergency Response Requests E2E").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Queue Scanning - India/Indonesia").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Synthetic / mock data").length).toBeGreaterThan(0);
   });
 
-  it("renders product-domain charts as a top-five ranked view first", async () => {
-    vi.spyOn(governanceApi, "summary").mockResolvedValue({ metrics: [] });
-    vi.spyOn(governanceApi, "agentActivity").mockResolvedValue({ agents: [] });
-    vi.spyOn(governanceApi, "productVolume").mockResolvedValue({
-      metrics: Array.from({ length: 6 }, (_, index) =>
-        metric({
-          metric_id: `product_volume:Domain ${index + 1}`,
-          title: `Requests touching Domain ${index + 1}`,
-          dimension: "product_domain",
-          value: 6 - index,
-        }),
-      ),
-    });
-    vi.spyOn(governanceApi, "processingTimeByProduct").mockResolvedValue({
-      metrics: [],
-    });
-    vi.spyOn(governanceApi, "bottlenecks").mockResolvedValue({ metrics: [] });
-    vi.spyOn(governanceApi, "responsePackageStatus").mockResolvedValue({
-      metrics: [],
-    });
-    vi.spyOn(governanceApi, "auditReadiness").mockResolvedValue({
-      requests_total: 0,
-      requests_with_all_required_events: 0,
-      coverage_percent: 0,
-      missing_events_by_request: {},
-      finalization_blocked_events: 0,
-      data_confidence: "fully_tracked",
-    });
-    vi.spyOn(governanceApi, "workNeedingAttention").mockResolvedValue({
-      items: [],
-    });
+  it("switches between Trends, Workload, People, and Attention sections", async () => {
+    vi.spyOn(lisIrtDashboardApi, "getDashboard").mockResolvedValue(
+      buildLisIrtDashboard(),
+    );
 
     render(
       <MemoryRouter>
@@ -157,38 +84,39 @@ describe("GovernanceInsightsPage", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("Top product domains")).toBeInTheDocument();
-    expect(screen.getByText("Domain 1")).toBeInTheDocument();
-    expect(screen.getByText("Domain 5")).toBeInTheDocument();
-    expect(screen.queryByText("Domain 6")).not.toBeInTheDocument();
-    expect(screen.getByText("Show all 6 (1 more)")).toBeInTheDocument();
-    expect(screen.getByText("Top 5 shown first")).toBeInTheDocument();
+    await screen.findByRole("heading", {
+      name: "LIS / IRT Vendor Analytics",
+    });
+
+    expect(screen.getByRole("tab", { name: "Trends" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("img", { name: "Median TAT trend" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Backlog and risk trend" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Workload" }));
+    expect(screen.getByText("SLO Boundary Status")).toBeInTheDocument();
+    expect(screen.getByText("Workflow / Silo Distribution")).toBeInTheDocument();
+    expect(screen.getByText("Workflow Category Mix")).toBeInTheDocument();
+    expect(screen.getByText("Regional Breakdown")).toBeInTheDocument();
+    expect(screen.getAllByText("At risk, not breached").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("tab", { name: "People" }));
+    expect(screen.getByText("Analyst Productivity")).toBeInTheDocument();
+    expect(screen.getByText("Capacity Signals")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Tickets \/ Analyst \/ Day:/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Attention" }));
+    expect(screen.getAllByText("Work Needing Attention").length).toBeGreaterThan(1);
+    expect(screen.getByText("Risk Drivers")).toBeInTheDocument();
+    expect(screen.getAllByText("Emergency Response Requests E2E").length).toBeGreaterThan(0);
   });
 
-  it("always shows all six agents even if the backend omits some", async () => {
-    vi.spyOn(governanceApi, "summary").mockResolvedValue({ metrics: [] });
-    vi.spyOn(governanceApi, "agentActivity").mockResolvedValue({
-      agents: [activity({})], // only Indexing Agent reported
-    });
-    vi.spyOn(governanceApi, "productVolume").mockResolvedValue({ metrics: [] });
-    vi.spyOn(governanceApi, "processingTimeByProduct").mockResolvedValue({
-      metrics: [],
-    });
-    vi.spyOn(governanceApi, "bottlenecks").mockResolvedValue({ metrics: [] });
-    vi.spyOn(governanceApi, "responsePackageStatus").mockResolvedValue({
-      metrics: [],
-    });
-    vi.spyOn(governanceApi, "auditReadiness").mockResolvedValue({
-      requests_total: 0,
-      requests_with_all_required_events: 0,
-      coverage_percent: 0,
-      missing_events_by_request: {},
-      finalization_blocked_events: 0,
-      data_confidence: "fully_tracked",
-    });
-    vi.spyOn(governanceApi, "workNeedingAttention").mockResolvedValue({
-      items: [],
-    });
+  it("reloads visible data when a leadership filter changes", async () => {
+    const spy = vi
+      .spyOn(lisIrtDashboardApi, "getDashboard")
+      .mockImplementation(async (filters) => buildLisIrtDashboard(filters));
 
     render(
       <MemoryRouter>
@@ -196,10 +124,72 @@ describe("GovernanceInsightsPage", () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText("RFP Agent Coverage");
-    for (const name of OFFICIAL_NAMES) {
-      expect(screen.getByText(name)).toBeInTheDocument();
-    }
+    fireEvent.change(await screen.findByLabelText("Silo"), {
+      target: { value: "Brazil" },
+    });
+
+    await waitFor(() =>
+      expect(spy).toHaveBeenLastCalledWith(
+        expect.objectContaining({ silo: "Brazil" }),
+      ),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Workload" }));
+    expect(
+      await screen.findByRole("button", {
+        name: (name) => name.startsWith("C E2E") && name.includes("Brazil"),
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Emergency Response Requests E2E/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders loading, error, and empty states", async () => {
+    vi.spyOn(lisIrtDashboardApi, "getDashboard").mockReturnValueOnce(
+      new Promise(() => undefined),
+    );
+    const { unmount } = render(
+      <MemoryRouter>
+        <GovernanceInsightsPage />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByRole("status", { name: "Loading LIS / IRT dashboard" }),
+    ).toBeInTheDocument();
+    unmount();
+
+    vi.restoreAllMocks();
+    vi.spyOn(lisIrtDashboardApi, "getDashboard").mockRejectedValueOnce(
+      new Error("adapter unavailable"),
+    );
+    const errorRender = render(
+      <MemoryRouter>
+        <GovernanceInsightsPage />
+      </MemoryRouter>,
+    );
+    expect(
+      await screen.findByText(/Could not load LIS \/ IRT governance data/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/adapter unavailable/)).toBeInTheDocument();
+    errorRender.unmount();
+
+    vi.restoreAllMocks();
+    vi.spyOn(lisIrtDashboardApi, "getDashboard").mockResolvedValueOnce(
+      buildLisIrtDashboard({ silo: "No matching silo" }),
+    );
+    render(
+      <MemoryRouter>
+        <GovernanceInsightsPage />
+      </MemoryRouter>,
+    );
+    fireEvent.click(await screen.findByRole("tab", { name: "Overview" }));
+    expect(
+      await screen.findByText("No work needing attention matches selected filters."),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Workload" }));
+    expect(
+      screen.getByText("No workflows match the selected filters."),
+    ).toBeInTheDocument();
   });
 });
 

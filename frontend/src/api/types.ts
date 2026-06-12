@@ -544,6 +544,193 @@ export type DataConfidence =
   | "synthetic_mock"
   | "unavailable";
 
+export type LeadershipHealthStatus =
+  | "on_track"
+  | "at_risk"
+  | "needs_intervention";
+
+export type DashboardRiskLevel = "low" | "watch" | "at_risk" | "critical";
+
+export type DashboardSlaStatus = "met" | "at_risk" | "missed" | "unknown";
+
+export type LeadershipKpiStatus = "healthy" | "watch" | "at_risk";
+
+export type LeadershipKpiUnit =
+  | "count"
+  | "tickets"
+  | "percent"
+  | "hours"
+  | "ratio"
+  | "tickets_per_day";
+
+export interface LisIrtDashboardFilters {
+  silo?: string;
+  workflow_category?: string;
+  workflow?: string;
+  region?: string;
+  manager_name?: string;
+  sla_status?: DashboardSlaStatus | "all";
+  risk_level?: DashboardRiskLevel | "all";
+  date_range?: "last_7_days" | "last_14_days" | "last_30_days";
+  platform?: string;
+  source?: string;
+  legal_process_type?: string;
+  nature_of_case?: string;
+  ticket_type?: string;
+  country?: string;
+  tags?: string;
+  manager_region?: string;
+  owner?: string;
+  partition_day?: string;
+  status_change_start?: string;
+  status_change_end?: string;
+}
+
+export interface DashboardFilterOptions {
+  silos: string[];
+  workflow_categories: string[];
+  workflows: string[];
+  regions: string[];
+  countries: string[];
+  manager_regions: string[];
+  manager_names: string[];
+  owners: string[];
+  sla_statuses: DashboardSlaStatus[];
+  risk_levels: DashboardRiskLevel[];
+  platforms: string[];
+  sources: string[];
+  legal_process_types: string[];
+  nature_of_case: string[];
+  ticket_types: string[];
+  tags: string[];
+}
+
+export interface DashboardFreshness {
+  generated_at: string;
+  latest_complete_day: string;
+  current_period_label: string;
+  comparison_period_label: string;
+  source_label: string;
+  data_confidence: DataConfidence;
+  is_synthetic: boolean;
+}
+
+export interface RiskDriver {
+  driver_id: string;
+  title: string;
+  description: string;
+  severity: DashboardRiskLevel;
+  dimension: string;
+  value: number;
+  unit: LeadershipKpiUnit;
+}
+
+export interface LeadershipHealth {
+  status: LeadershipHealthStatus;
+  narrative: string;
+  drivers: RiskDriver[];
+}
+
+export interface LeadershipKpi {
+  metric_id: string;
+  title: string;
+  value: number;
+  unit: LeadershipKpiUnit;
+  status: LeadershipKpiStatus;
+  target_value: number | null;
+  target_label: string | null;
+  previous_value: number | null;
+  delta_value: number | null;
+  delta_direction: "up" | "down" | "flat";
+  caption: string;
+  data_confidence: DataConfidence;
+  drilldown_filter?: Partial<LisIrtDashboardFilters>;
+}
+
+export interface DailyOpsPoint {
+  date: string;
+  volume_in: number;
+  volume_out: number;
+  net_flow: number;
+  slo_compliance_percent: number;
+  median_tat_hours: number;
+  median_triage_hours: number;
+  backlog: number;
+  partner_controllable_backlog_percent: number;
+  escalation_rate_percent: number;
+  qa_score_percent: number;
+  audit_rate_percent: number;
+}
+
+export interface SlaStatusBreakdown {
+  status: DashboardSlaStatus;
+  label: string;
+  count: number;
+  percent: number;
+}
+
+export interface WorkflowBreakdown {
+  silo: string;
+  workflow: string;
+  category: string;
+  volume: number;
+  share_percent: number;
+  slo_compliance_percent: number;
+  median_tat_hours: number;
+  risk_level: DashboardRiskLevel;
+}
+
+export interface AnalystProductivityPoint {
+  analyst_id: string;
+  analyst_name: string;
+  manager_name: string;
+  region: string;
+  tickets_per_day: number;
+  median_claim_hours: number;
+  utilization_percent: number;
+  risk_level: DashboardRiskLevel;
+}
+
+export interface RegionalBreakdown {
+  region: string;
+  country: string;
+  volume_in: number;
+  volume_out: number;
+  slo_compliance_percent: number;
+  backlog: number;
+  risk_level: DashboardRiskLevel;
+}
+
+export interface WorkAttentionItem {
+  item_id: string;
+  workflow: string;
+  silo: string;
+  manager_name: string;
+  owner: string;
+  region: string;
+  country: string;
+  risk_level: DashboardRiskLevel;
+  aging_hours: number;
+  sla_status: DashboardSlaStatus;
+  current_volume: number;
+  reason: string;
+  recommended_action: string;
+}
+
+export interface LisIrtDashboardResponse {
+  freshness: DashboardFreshness;
+  active_filters: LisIrtDashboardFilters;
+  filter_options: DashboardFilterOptions;
+  health: LeadershipHealth;
+  kpis: LeadershipKpi[];
+  daily_trends: DailyOpsPoint[];
+  sla_status_breakdown: SlaStatusBreakdown[];
+  workflow_breakdown: WorkflowBreakdown[];
+  analyst_productivity: AnalystProductivityPoint[];
+  regional_breakdown: RegionalBreakdown[];
+  work_attention: WorkAttentionItem[];
+}
+
 export interface GovernanceMetric {
   metric_id: string;
   title: string;
