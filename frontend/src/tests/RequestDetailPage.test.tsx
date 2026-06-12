@@ -49,6 +49,44 @@ const AUDIT_EVENT: AuditEvent = {
 afterEach(() => vi.restoreAllMocks());
 
 describe("RequestDetailPage", () => {
+  it("renders a tabbed request command center with Overview selected by default", async () => {
+    vi.spyOn(api, "getLegalRequest").mockResolvedValue(makeLegalRequest());
+    vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
+
+    renderDetail("LER-2026-004812");
+
+    expect(await screen.findByRole("heading", { name: "LER-2026-004812" }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("tab", { name: "Evidence" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Agents" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Drafts" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Audit" })).toBeInTheDocument();
+    expect(screen.getByText("Review focus")).toBeInTheDocument();
+  });
+
+  it("switches tabs to show evidence and agent workspaces", async () => {
+    vi.spyOn(api, "getLegalRequest").mockResolvedValue(makeLegalRequest());
+    vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
+
+    renderDetail("LER-2026-004812");
+
+    fireEvent.click(await screen.findByRole("tab", { name: "Evidence" }));
+    expect(
+      await screen.findByRole("document", {
+        name: "Source request document sections",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Agents" }));
+    expect(
+      await screen.findByRole("list", { name: "Six-Agent Workflow Rail" }),
+    ).toBeInTheDocument();
+  });
+
   it("renders the rail with all six official agents and live run data", async () => {
     const request = makeLegalRequest({
       agent_runs: {
@@ -68,6 +106,8 @@ describe("RequestDetailPage", () => {
     vi.spyOn(api, "auditTimeline").mockResolvedValue([AUDIT_EVENT]);
 
     renderDetail(request.legal_request_id);
+
+    fireEvent.click(await screen.findByRole("tab", { name: "Agents" }));
 
     const rail = await screen.findByRole("list", {
       name: "Six-Agent Workflow Rail",
@@ -198,6 +238,8 @@ describe("RequestDetailPage", () => {
 
     renderDetail(request.legal_request_id);
 
+    fireEvent.click(await screen.findByRole("tab", { name: "Evidence" }));
+
     const doc = await screen.findByRole("document", {
       name: "Source request document sections",
     });
@@ -240,6 +282,8 @@ describe("RequestDetailPage", () => {
     vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
 
     renderDetail("LER-2026-004812");
+
+    fireEvent.click(await screen.findByRole("tab", { name: "Evidence" }));
 
     const doc = await screen.findByRole("document", {
       name: "Source request document sections",
@@ -286,6 +330,8 @@ describe("RequestDetailPage", () => {
 
     renderDetail("LER-2026-004812");
 
+    fireEvent.click(await screen.findByRole("tab", { name: "Evidence" }));
+
     expect(await screen.findByText("Account id: ACC-NO-EVIDENCE")).toHaveAttribute(
       "title",
       "No source evidence available",
@@ -302,6 +348,8 @@ describe("RequestDetailPage", () => {
     vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
 
     renderDetail("LER-2026-004812");
+
+    fireEvent.click(await screen.findByRole("tab", { name: "Drafts" }));
 
     expect(
       await screen.findByText("PROD-LER-2026-004812-01"),
@@ -341,6 +389,8 @@ describe("RequestDetailPage", () => {
     vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
 
     renderDetail("LER-2026-004812");
+
+    fireEvent.click(await screen.findByRole("tab", { name: "Drafts" }));
 
     const draftButton = await screen.findByRole("button", {
       name: "Draft response package",
