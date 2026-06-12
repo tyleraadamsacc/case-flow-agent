@@ -9,7 +9,7 @@ import { makeAgentRun, makeLegalRequest } from "./fixtures";
 afterEach(() => vi.restoreAllMocks());
 
 describe("RequestQueuePage", () => {
-  it("renders the seeded requests with state and next human action", async () => {
+  it("renders the seeded requests with polished queue status and next human action", async () => {
     vi.spyOn(api, "listAgentRuns").mockImplementation(async (requestId) => {
       if (requestId === "LER-2026-004821") {
         return [
@@ -53,20 +53,23 @@ describe("RequestQueuePage", () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText("LER-2026-004812")).toBeInTheDocument();
-    expect(screen.getByText("LER-2026-004821")).toBeInTheDocument();
-    expect(screen.getByText("Received")).toBeInTheDocument();
+    expect((await screen.findAllByText("LER-2026-004812")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("LER-2026-004821").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: /All requests/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Ready for decision/ }).length).toBeGreaterThan(0);
+    expect(screen.getByText("Guided processing path")).toBeInTheDocument();
+    expect(screen.getByText("Queue insight")).toBeInTheDocument();
     expect(screen.getAllByText("Extract request").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Analyst review pending").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Resolve review flags").length).toBeGreaterThan(0);
-    expect(screen.getByText("Blocking deficiency")).toBeInTheDocument();
-    expect(screen.getByText("Blocking deficiency review")).toBeInTheDocument();
-    expect(screen.getByText("1 audit event linked")).toBeInTheDocument();
-    expect(screen.getByText("Guided processing path")).toBeInTheDocument();
+    expect(screen.getByText("1 blocking deficiency")).toBeInTheDocument();
+    expect(screen.getByText(/Blocking deficiency review/)).toBeInTheDocument();
+    expect(await screen.findByText(/1 audit event linked/)).toBeInTheDocument();
+    expect(screen.getAllByText("Six-agent workflow not started").length).toBeGreaterThan(0);
     expect(screen.getByText("2 of 2 requests")).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: /Open request LER-2026-004821.*Next required action Resolve review flags/,
+        name: /Open request LER-2026-004821.*Next required action: Resolve review flags/,
       }),
     ).toBeInTheDocument();
   });
@@ -114,17 +117,51 @@ describe("RequestQueuePage", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: /Blocked/ }));
+    const blockedControls = await screen.findAllByRole("button", { name: /Blocked/ });
+    fireEvent.click(blockedControls[0]);
 
-    expect(screen.getByRole("button", { name: /Blocked/ })).toHaveAttribute(
+    expect(blockedControls[0]).toHaveAttribute(
       "aria-pressed",
       "true",
     );
     expect(screen.queryByText("LER-2026-004812")).not.toBeInTheDocument();
-    expect(screen.getByText("LER-2026-004821")).toBeInTheDocument();
+    expect(screen.getAllByText("LER-2026-004821").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Next required action").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Resolve review flags").length).toBeGreaterThan(0);
-    expect(screen.getByText("Blocking deficiency review")).toBeInTheDocument();
+    expect(screen.getByText(/Blocking deficiency review/)).toBeInTheDocument();
+  });
+
+  it("filters the queue with human-readable status chips", async () => {
+    vi.spyOn(api, "listLegalRequests").mockResolvedValue([
+      makeLegalRequest({
+        legal_request_id: "LER-2026-004812",
+        workflow_state: "request_received",
+        requesting_agency: null,
+        legal_process: null,
+      }),
+      makeLegalRequest({
+        legal_request_id: "LER-2026-004821",
+        workflow_state: "analyst_review_pending",
+      }),
+    ]);
+    vi.spyOn(api, "listAgentRuns").mockResolvedValue([]);
+
+    render(
+      <MemoryRouter>
+        <RequestQueuePage />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Awaiting intake" }));
+
+    expect(screen.getByRole("button", { name: "Awaiting intake" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getAllByText("LER-2026-004812").length).toBeGreaterThan(0);
+    expect(screen.queryByText("LER-2026-004821")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Synthetic / mock").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Human review required").length).toBeGreaterThan(0);
   });
 
   it("shows an empty queue view without losing filter controls", async () => {
@@ -180,5 +217,36 @@ describe("RequestQueuePage", () => {
     );
 
     expect(await screen.findByText("Request detail route")).toBeInTheDocument();
+  });
+
+  it("does not render forbidden autonomous-action phrases", async () => {
+    const forbidden = [
+      "sent automatically",
+      "production released",
+      "final certified output",
+      "disclosure complete",
+      "autonomous legal response",
+      "approved by agent",
+      "fully automated",
+    ];
+    vi.spyOn(api, "listLegalRequests").mockResolvedValue([
+      makeLegalRequest({
+        legal_request_id: "LER-2026-004812",
+        workflow_state: "request_received",
+      }),
+    ]);
+    vi.spyOn(api, "listAgentRuns").mockResolvedValue([]);
+
+    const { container } = render(
+      <MemoryRouter>
+        <RequestQueuePage />
+      </MemoryRouter>,
+    );
+
+    await screen.findAllByText("LER-2026-004812");
+    const text = (container.textContent ?? "").toLowerCase();
+    for (const phrase of forbidden) {
+      expect(text).not.toContain(phrase);
+    }
   });
 });
