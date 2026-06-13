@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -20,9 +20,9 @@ const OFFICIAL_NAMES = [
   "Automation Agent",
 ];
 
-function renderDetail(id: string) {
+function renderDetail(id: string, initialEntry = `/requests/${id}`) {
   return render(
-    <MemoryRouter initialEntries={[`/requests/${id}`]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/requests/:id" element={<RequestDetailPage />} />
       </Routes>
@@ -49,6 +49,50 @@ const AUDIT_EVENT: AuditEvent = {
 afterEach(() => vi.restoreAllMocks());
 
 describe("RequestDetailPage", () => {
+  it("turns queue next intent into one pulsing primary action and focuses it", async () => {
+    vi.spyOn(api, "getLegalRequest").mockResolvedValue(makeLegalRequest());
+    vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    try {
+      renderDetail(
+        "LER-2026-004812",
+        "/requests/LER-2026-004812?intent=next",
+      );
+
+      const primaryButton = await screen.findByRole("button", {
+        name: "Run six-agent workflow",
+      });
+      expect(primaryButton).toHaveClass("cf-button--guided-pulse");
+      expect(
+        within(screen.getByLabelText("Next guided action")).getByRole("button", {
+          name: "Show next button",
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getAllByRole("button", { name: "Run six-agent workflow" }),
+      ).toHaveLength(1);
+
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+      expect(document.activeElement).toBe(primaryButton);
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+          configurable: true,
+          value: originalScrollIntoView,
+        });
+      } else {
+        delete (HTMLElement.prototype as { scrollIntoView?: unknown })
+          .scrollIntoView;
+      }
+    }
+  });
+
   it("renders a guided request command center with the active next step selected", async () => {
     vi.spyOn(api, "getLegalRequest").mockResolvedValue(makeLegalRequest());
     vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
@@ -257,6 +301,14 @@ describe("RequestDetailPage", () => {
     expect(
       screen.getByRole("button", { name: "Open ETL Agent output" }),
     ).toBeInTheDocument();
+    expect(
+      within(screen.getByLabelText("Next guided action")).getByRole("button", {
+        name: "Open workspace",
+      }),
+    ).toHaveClass("cf-button--guided-pulse");
+    expect(
+      screen.getByRole("button", { name: "Open ETL Agent output" }),
+    ).not.toHaveClass("cf-button--guided-pulse");
     expect(screen.getByRole("tab", { name: "Agent outputs" })).toHaveAttribute(
       "aria-selected",
       "true",

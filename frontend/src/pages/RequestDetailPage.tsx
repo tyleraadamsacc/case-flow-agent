@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { api, ApiError } from "../api/client";
@@ -49,6 +56,80 @@ const REQUEST_TABS: Array<{ id: RequestDetailTab; label: string }> = [
   { id: "audit", label: "Audit trail" },
 ];
 
+function tabForGuidedAction(
+  kind: RequestGuidedActionKind,
+): RequestDetailTab | null {
+  switch (kind) {
+    case "openEvidence":
+      return "evidence";
+    case "openAgents":
+      return "agents";
+    case "openDrafts":
+      return "drafts";
+    case "openAudit":
+      return "audit";
+    default:
+      return null;
+  }
+}
+
+function shouldFocusGuidedPrimary(kind: RequestGuidedActionKind) {
+  return kind === "extract" || kind === "validate" || kind === "runAgents";
+}
+
+function scrollAndFocus(target: HTMLElement | null, block: ScrollLogicalPosition) {
+  if (!target) {
+    return;
+  }
+  const reduceMotion =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  target.scrollIntoView?.({
+    block,
+    behavior: reduceMotion ? "auto" : "smooth",
+  });
+  target.focus({ preventScroll: true });
+}
+
+function buildGuidanceForRequest(
+  request: LegalRequest,
+  auditEvents: AuditEvent[],
+  finalizationStatus: FinalizationStatus | null,
+) {
+  const completedAgents = Object.values(request.agent_runs).filter(
+    (run) => run.status === "complete",
+  ).length;
+  const reviewFlags = [
+    ...(request.classification?.review_reasons ?? []),
+    ...Object.values(request.agent_runs).flatMap((run) => run.risk_flags),
+    ...request.deficiency_findings
+      .filter((finding) => finding.severity === "blocking")
+      .map((finding) => finding.code),
+  ];
+  const sourceBackedIdentifiers = request.subject_identifiers.filter((identifier) =>
+    Boolean(identifier.source_span),
+  ).length;
+  const blockingFindings = request.deficiency_findings.filter(
+    (finding) => finding.severity === "blocking",
+  ).length;
+
+  return {
+    completedAgents,
+    reviewFlags,
+    sourceBackedIdentifiers,
+    blockingFindings,
+    guidance: buildRequestGuidance({
+      request,
+      auditEvents,
+      finalizationStatus,
+      completedAgents,
+      reviewFlags,
+      sourceBackedIdentifiers,
+      blockingFindings,
+    }),
+  };
+}
+
 /** Request Detail — the hero screen (plan §13): source document with
  * extracted spans, structured fields, the live Six-Agent Workflow Rail,
  * drafted artifacts, and the human review panel. Every state-changing
@@ -72,7 +153,11 @@ export default function RequestDetailPage() {
   const [activeTraceTarget, setActiveTraceTarget] =
     useState<SourceTraceTarget | null>(null);
   const reviewRegionRef = useRef<HTMLDivElement | null>(null);
+  const guidedPrimaryActionRef = useRef<HTMLButtonElement | null>(null);
+  const guidedStageRef = useRef<HTMLElement | null>(null);
+  const lastGuidedTargetRef = useRef<string | null>(null);
   const refreshSerialRef = useRef(0);
+  const searchParamString = searchParams.toString();
 
   const refreshSupportingData = useCallback((refreshSerial: number) => {
     void Promise.allSettled([
@@ -131,6 +216,78 @@ export default function RequestDetailPage() {
     return () => window.clearTimeout(timeout);
   }, [refresh]);
 
+  useEffect(() => {
+    if (!request) {
+      return;
+    }
+
+    const intent = searchParams.get("intent");
+    if (intent !== "next" && intent !== "decision") {
+      return;
+    }
+
+    const { guidance: nextGuidance } = buildGuidanceForRequest(
+      request,
+      auditEvents,
+      finalizationStatus,
+    );
+
+    if (intent === "next") {
+      if (nextGuidance.primaryActionKind === "focusDecisionPanel") {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete("tab");
+        nextParams.set("intent", "decision");
+        setSearchParams(nextParams, { replace: true });
+        return;
+      }
+
+      const targetTab = tabForGuidedAction(nextGuidance.primaryActionKind);
+      if (targetTab && searchParams.get("tab") !== targetTab) {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.set("intent", "next");
+        nextParams.set("tab", targetTab);
+        setSearchParams(nextParams, { replace: true });
+        return;
+      }
+    }
+
+    const targetKey = [
+      request.legal_request_id,
+      intent,
+      nextGuidance.primaryActionKind,
+      searchParams.get("tab") ?? "",
+      nextGuidance.nextRequiredAction,
+    ].join(":");
+    if (lastGuidedTargetRef.current === targetKey) {
+      return;
+    }
+    lastGuidedTargetRef.current = targetKey;
+
+    window.setTimeout(() => {
+      if (
+        intent === "decision" ||
+        nextGuidance.primaryActionKind === "focusDecisionPanel"
+      ) {
+        scrollAndFocus(reviewRegionRef.current, "center");
+        return;
+      }
+
+      if (shouldFocusGuidedPrimary(nextGuidance.primaryActionKind)) {
+        scrollAndFocus(guidedPrimaryActionRef.current, "center");
+        return;
+      }
+
+      scrollAndFocus(guidedStageRef.current, "start");
+    }, 160);
+  }, [
+    auditEvents,
+    finalizationStatus,
+    request,
+    searchParamString,
+    searchParams,
+    setSearchParams,
+  ]);
+
   const auditActions = useMemo(
     () =>
       Object.fromEntries(
@@ -150,7 +307,7 @@ export default function RequestDetailPage() {
       setActionReceipt(receipt);
       const nextParams = new URLSearchParams(searchParams);
       nextParams.delete("tab");
-      nextParams.delete("intent");
+      nextParams.set("intent", "next");
       setSearchParams(nextParams, { replace: true });
     } catch (cause) {
       if (cause instanceof ApiError) {
@@ -213,33 +370,14 @@ export default function RequestDetailPage() {
     (finding) => finding.severity === "blocking",
   );
   const sourceSections = request.source_sections ?? [];
-  const completedAgents = Object.values(request.agent_runs).filter(
-    (run) => run.status === "complete",
-  ).length;
-  const reviewFlags = [
-    ...(request.classification?.review_reasons ?? []),
-    ...Object.values(request.agent_runs).flatMap((run) => run.risk_flags),
-    ...request.deficiency_findings
-      .filter((finding) => finding.severity === "blocking")
-      .map((finding) => finding.code),
-  ];
-
-  const sourceBackedIdentifiers = request.subject_identifiers.filter((identifier) =>
-    Boolean(identifier.source_span),
-  ).length;
-  const blockingFindings = request.deficiency_findings.filter(
-    (finding) => finding.severity === "blocking",
-  ).length;
-  const latestAuditEvent = auditEvents[auditEvents.length - 1];
-  const guidance = buildRequestGuidance({
-    request,
-    auditEvents,
-    finalizationStatus,
+  const {
     completedAgents,
     reviewFlags,
     sourceBackedIdentifiers,
     blockingFindings,
-  });
+    guidance,
+  } = buildGuidanceForRequest(request, auditEvents, finalizationStatus);
+  const latestAuditEvent = auditEvents[auditEvents.length - 1];
   const tabParam = searchParams.get("tab");
   const intentParam = searchParams.get("intent");
   const decisionIntent = intentParam === "decision";
@@ -264,9 +402,16 @@ export default function RequestDetailPage() {
     ? "Record the human route, escalation, QA handoff, or final approval when the checklist is ready."
     : "Use this supporting workspace to finish the current guided task.";
 
-  function handleTabChange(tab: RequestDetailTab) {
+  function handleTabChange(
+    tab: RequestDetailTab,
+    options: { guidedIntent?: boolean } = {},
+  ) {
     const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete("intent");
+    if (options.guidedIntent) {
+      nextParams.set("intent", "next");
+    } else {
+      nextParams.delete("intent");
+    }
     if (!decisionPanelCanLead && tab === guidance.recommendedTab) {
       nextParams.delete("tab");
     } else {
@@ -326,16 +471,16 @@ export default function RequestDetailPage() {
         void run("Six-agent workflow", () => api.runAgentRail(id));
         return;
       case "openEvidence":
-        handleTabChange("evidence");
+        handleTabChange("evidence", { guidedIntent: true });
         return;
       case "openAgents":
-        handleTabChange("agents");
+        handleTabChange("agents", { guidedIntent: true });
         return;
       case "openDrafts":
-        handleTabChange("drafts");
+        handleTabChange("drafts", { guidedIntent: true });
         return;
       case "openAudit":
-        handleTabChange("audit");
+        handleTabChange("audit", { guidedIntent: true });
         return;
       case "focusDecisionPanel":
         focusDecisionPanel();
@@ -344,6 +489,21 @@ export default function RequestDetailPage() {
       default:
         return;
     }
+  }
+
+  function handleLocateGuidedTarget() {
+    if (guidance.primaryActionKind === "focusDecisionPanel") {
+      focusDecisionPanel();
+      return;
+    }
+
+    const targetTab = tabForGuidedAction(guidance.primaryActionKind);
+    if (targetTab) {
+      handleTabChange(targetTab, { guidedIntent: true });
+      return;
+    }
+
+    scrollAndFocus(guidedPrimaryActionRef.current, "center");
   }
 
   function resolveTraceTarget(
@@ -377,7 +537,7 @@ export default function RequestDetailPage() {
         auditEvents={auditEvents}
         reviewPanelMode={guidance.reviewPanelMode}
         onUpdated={handleUpdated}
-        onActionResult={(notice, updated) =>
+        onActionResult={(notice, updated) => {
           setActionReceipt({
             actionName: "Human decision",
             title: "Human decision recorded",
@@ -386,8 +546,12 @@ export default function RequestDetailPage() {
             )}.`,
             workflowState: updated.workflow_state,
             auditSummaries: [],
-          })
-        }
+          });
+          const nextParams = new URLSearchParams(searchParams);
+          nextParams.delete("tab");
+          nextParams.set("intent", "next");
+          setSearchParams(nextParams, { replace: true });
+        }}
       />
     );
   }
@@ -490,6 +654,14 @@ export default function RequestDetailPage() {
     return <AuditTab auditEvents={auditEvents} />;
   }
 
+  const primaryActionDisabled = guidedActionDisabled(guidance.primaryActionKind);
+  const primaryActionPulses =
+    !primaryActionDisabled && shouldFocusGuidedPrimary(guidance.primaryActionKind);
+  const stickyActionPulses =
+    !primaryActionDisabled &&
+    !shouldFocusGuidedPrimary(guidance.primaryActionKind) &&
+    guidance.primaryActionKind !== "none";
+
   return (
     <ConsoleShell title={`Request ${request.legal_request_id}`}>
       <div className="cf-request-command">
@@ -560,10 +732,19 @@ export default function RequestDetailPage() {
           </p>
         ) : null}
 
+        <GuidedNextStepBar
+          guidance={guidance}
+          busyLabel={busy}
+          pulseLocateAction={stickyActionPulses}
+          onLocateNext={handleLocateGuidedTarget}
+        />
+
         <GuidedReviewWorkbench
           guidance={guidance}
           actionReceipt={actionReceipt}
-          primaryActionDisabled={guidedActionDisabled(guidance.primaryActionKind)}
+          primaryActionDisabled={primaryActionDisabled}
+          primaryActionRef={guidedPrimaryActionRef}
+          pulsePrimaryAction={primaryActionPulses}
           busyLabel={busy}
           onAction={handleGuidedAction}
           onStepSelect={(step) => {
@@ -573,7 +754,12 @@ export default function RequestDetailPage() {
           }}
         />
 
-        <section className="cf-guided-stage" aria-label="Request review workspace">
+        <section
+          className="cf-guided-stage"
+          aria-label="Request review workspace"
+          ref={guidedStageRef}
+          tabIndex={-1}
+        >
           <div className="cf-guided-stage__header">
             <div>
               <span className="cf-guided-workbench__eyebrow">Current workspace</span>
@@ -659,10 +845,68 @@ function RequestTabNav({
   );
 }
 
+function guidedPrimaryChangesState(guidance: RequestGuidance) {
+  return ["extract", "validate", "runAgents"].includes(guidance.primaryActionKind);
+}
+
+function guidedPrimaryLabel(guidance: RequestGuidance, busyLabel: string | null) {
+  const primaryBusy =
+    busyLabel === "Extraction" ||
+    busyLabel === "Validation" ||
+    busyLabel === "Six-agent workflow";
+  if (!primaryBusy) {
+    return guidance.primaryActionLabel;
+  }
+  if (busyLabel === "Extraction") {
+    return "Extracting...";
+  }
+  if (busyLabel === "Validation") {
+    return "Validating...";
+  }
+  return "Running six agents...";
+}
+
+function GuidedNextStepBar({
+  guidance,
+  busyLabel,
+  pulseLocateAction,
+  onLocateNext,
+}: {
+  guidance: RequestGuidance;
+  busyLabel: string | null;
+  pulseLocateAction: boolean;
+  onLocateNext: () => void;
+}) {
+  const locateLabel = shouldFocusGuidedPrimary(guidance.primaryActionKind)
+    ? "Show next button"
+    : guidance.primaryActionKind === "focusDecisionPanel"
+      ? "Open decision controls"
+      : "Open workspace";
+  return (
+    <section className="cf-next-step-bar" aria-label="Next guided action">
+      <div className="cf-next-step-bar__copy">
+        <span>Next step</span>
+        <strong>{guidance.nextRequiredAction}</strong>
+        <small>{guidance.resultExpectation}</small>
+      </div>
+      <Button
+        variant="tonal"
+        className={pulseLocateAction ? "cf-button--guided-pulse" : undefined}
+        disabled={busyLabel !== null || guidance.primaryActionKind === "none"}
+        onClick={onLocateNext}
+      >
+        {busyLabel ? "Working..." : locateLabel}
+      </Button>
+    </section>
+  );
+}
+
 function GuidedReviewWorkbench({
   guidance,
   actionReceipt,
   primaryActionDisabled,
+  primaryActionRef,
+  pulsePrimaryAction,
   busyLabel,
   onAction,
   onStepSelect,
@@ -670,24 +914,14 @@ function GuidedReviewWorkbench({
   guidance: RequestGuidance;
   actionReceipt: GuidedActionReceiptModel | null;
   primaryActionDisabled: boolean;
+  primaryActionRef: Ref<HTMLButtonElement>;
+  pulsePrimaryAction: boolean;
   busyLabel: string | null;
   onAction: (kind: RequestGuidedActionKind) => void;
   onStepSelect: (step: RequestGuidance["steps"][number]) => void;
 }) {
-  const primaryChangesState = ["extract", "validate", "runAgents"].includes(
-    guidance.primaryActionKind,
-  );
-  const primaryBusy =
-    busyLabel === "Extraction" ||
-    busyLabel === "Validation" ||
-    busyLabel === "Six-agent workflow";
-  const primaryLabel = primaryBusy
-    ? busyLabel === "Extraction"
-      ? "Extracting..."
-      : busyLabel === "Validation"
-        ? "Validating..."
-        : "Running six agents..."
-    : guidance.primaryActionLabel;
+  const primaryChangesState = guidedPrimaryChangesState(guidance);
+  const primaryLabel = guidedPrimaryLabel(guidance, busyLabel);
   const primaryBlocker = guidance.blockerTasks[0];
 
   return (
@@ -737,8 +971,10 @@ function GuidedReviewWorkbench({
         ) : null}
         <div className="cf-guided-workbench__actions">
           <Button
+            ref={primaryActionRef}
             variant={primaryChangesState ? "filled" : "tonal"}
             glow={primaryChangesState && !primaryActionDisabled}
+            className={pulsePrimaryAction ? "cf-button--guided-pulse" : undefined}
             disabled={primaryActionDisabled}
             onClick={() => onAction(guidance.primaryActionKind)}
           >

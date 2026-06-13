@@ -59,6 +59,27 @@
   filter: blur(4px);
 }
 
+.cf-button--guided-pulse:not(:disabled) {
+  position: relative;
+}
+
+.cf-button--guided-pulse:not(:disabled)::before {
+  position: absolute;
+  inset: -6px;
+  border: 2px solid rgba(26, 115, 232, 0.32);
+  border-radius: inherit;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  animation: cf-guided-button-pulse 2.4s cubic-bezier(0.2, 0, 0, 1) infinite;
+}
+
+.cf-button--guided-pulse:not(:disabled):hover::before,
+.cf-button--guided-pulse:not(:disabled):focus-visible::before {
+  animation-play-state: paused;
+  opacity: 0.5;
+}
+
 .cf-button--tonal {
   background: var(--surface-tint-blue);
   color: var(--blue-strong);
@@ -301,6 +322,30 @@ button.cf-chip {
   }
   50% {
     opacity: 0.35;
+  }
+}
+
+@keyframes cf-guided-button-pulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  18% {
+    opacity: 0.55;
+  }
+
+  72%,
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-button--guided-pulse:not(:disabled)::before {
+    animation: none;
+    opacity: 0.42;
   }
 }
 
