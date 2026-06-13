@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -46,7 +52,10 @@ const AUDIT_EVENT: AuditEvent = {
   correlation_id: null,
 };
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("RequestDetailPage", () => {
   it("turns queue next intent into one pulsing primary action and focuses it", async () => {
@@ -655,6 +664,94 @@ describe("RequestDetailPage", () => {
     expect(screen.getByText("Next: Validate extracted fields")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Validate request" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a timed Gemini run and then returns to agent review", async () => {
+    const initial = makeLegalRequest({
+      workflow_state: "request_validated",
+      agent_runs: {},
+    });
+    const updated = makeLegalRequest({
+      workflow_state: "analyst_review_pending",
+      agent_runs: {
+        indexing_agent: makeAgentRun({
+          agent_id: "indexing_agent",
+          agent_name: "Indexing Agent",
+        }),
+        triaging_agent: makeAgentRun({
+          agent_id: "triaging_agent",
+          agent_name: "Triaging Agent",
+          requires_human_review: true,
+          review_reasons: ["location_scope_review"],
+        }),
+        etl_agent: makeAgentRun({
+          agent_id: "etl_agent",
+          agent_name: "ETL Agent",
+        }),
+        note_taking_and_data_entry_agent: makeAgentRun({
+          agent_id: "note_taking_and_data_entry_agent",
+          agent_name: "Note Taking and Data Entry Agent",
+        }),
+        text_content_agent: makeAgentRun({
+          agent_id: "text_content_agent",
+          agent_name: "Text Content Agent",
+        }),
+        automation_agent: makeAgentRun({
+          agent_id: "automation_agent",
+          agent_name: "Automation Agent",
+        }),
+      },
+    });
+    vi.spyOn(api, "getLegalRequest")
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(updated);
+    vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
+    vi.spyOn(api, "finalizationStatus").mockResolvedValue({
+      workflow_state: "analyst_review_pending",
+      required_attestations: [],
+      attested: [],
+      missing_attestations: [],
+      approvals_recorded: 0,
+      approvals_required: 1,
+      requires_senior_approval: false,
+      senior_approval_present: false,
+      blocked_agent_runs: [],
+      blocking_reasons: [],
+      ready_for_approval: false,
+    });
+    vi.spyOn(api, "runAgentRail").mockResolvedValue({
+      legal_request: updated,
+      agent_runs: Object.values(updated.agent_runs),
+    });
+
+    renderDetail(
+      initial.legal_request_id,
+      `/requests/${initial.legal_request_id}?demoSpeed=fast`,
+    );
+
+    fireEvent.click(await screen.findByRole("button", {
+      name: "Run six-agent workflow",
+    }));
+
+    expect(
+      screen.getByRole("region", { name: "Synthetic Gemini live agent run" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Gemini agents are running")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show live run" })).toBeEnabled();
+    expect(screen.getByText("Source packet")).toBeInTheDocument();
+
+    expect(
+      await screen.findByText("Gemini agent run complete", {}, { timeout: 3000 }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("Six-agent workflow complete").length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getAllByText(/6 agent outputs refreshed/).length).toBeGreaterThan(0);
+    expect(
+      within(screen.getByLabelText("Next guided action")).getByRole("button", {
+        name: "Open workspace",
+      }),
     ).toBeInTheDocument();
   });
 

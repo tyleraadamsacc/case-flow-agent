@@ -23,11 +23,19 @@ import ReviewPanel from "../components/request/ReviewPanel";
 import SourceDocumentPanel from "../components/request/SourceDocumentPanel";
 import type { SourceTraceTarget } from "../components/request/SourceDocumentPanel";
 import WorkflowProgress from "../components/request/WorkflowProgress";
+import LiveGeminiRunPanel, {
+  type LiveGeminiRunStatus,
+} from "../components/agents/LiveGeminiRunPanel";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Chip from "../components/ui/Chip";
 import StatusBadge from "../components/ui/StatusBadge";
 import { toRailRuns } from "../lib/agentRunMapping";
+import {
+  geminiRunDemoTotalMs,
+  normalizeGeminiRunDemoSpeed,
+  type GeminiRunDemoSpeed,
+} from "../lib/geminiRunDemo";
 import {
   summarizeGuidedActionResult,
   type GuidedActionReceipt as GuidedActionReceiptModel,
@@ -47,6 +55,14 @@ import {
 } from "../lib/requestDisplay";
 
 type RequestDetailTab = RequestWorkbenchTab;
+
+interface LiveAgentRunState {
+  status: LiveGeminiRunStatus;
+  startedAt: number;
+  speed: GeminiRunDemoSpeed;
+  receipt?: GuidedActionReceiptModel | null;
+  errorMessage?: string | null;
+}
 
 const REQUEST_TABS: Array<{ id: RequestDetailTab; label: string }> = [
   { id: "overview", label: "Review brief" },
@@ -89,6 +105,23 @@ function scrollAndFocus(target: HTMLElement | null, block: ScrollLogicalPosition
     behavior: reduceMotion ? "auto" : "smooth",
   });
   target.focus({ preventScroll: true });
+}
+
+function waitForGeminiDemo(speed: GeminiRunDemoSpeed) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, geminiRunDemoTotalMs(speed));
+  });
+}
+
+function actionErrorMessage(name: string, cause: unknown) {
+  if (cause instanceof ApiError) {
+    const detail =
+      typeof cause.detail === "string"
+        ? cause.detail
+        : JSON.stringify(cause.detail);
+    return `${name} refused: ${detail}`;
+  }
+  return `${name} failed: ${(cause as Error).message}`;
 }
 
 function buildGuidanceForRequest(
@@ -149,12 +182,16 @@ export default function RequestDetailPage() {
   );
   const [actionReceipt, setActionReceipt] =
     useState<GuidedActionReceiptModel | null>(null);
+  const [liveAgentRun, setLiveAgentRun] = useState<LiveAgentRunState | null>(
+    null,
+  );
   const [busy, setBusy] = useState<string | null>(null);
   const [activeTraceTarget, setActiveTraceTarget] =
     useState<SourceTraceTarget | null>(null);
   const reviewRegionRef = useRef<HTMLDivElement | null>(null);
   const guidedPrimaryActionRef = useRef<HTMLButtonElement | null>(null);
   const guidedStageRef = useRef<HTMLElement | null>(null);
+  const liveAgentRunRef = useRef<HTMLElement | null>(null);
   const lastGuidedTargetRef = useRef<string | null>(null);
   const refreshSerialRef = useRef(0);
   const searchParamString = searchParams.toString();
@@ -215,6 +252,10 @@ export default function RequestDetailPage() {
 
     return () => window.clearTimeout(timeout);
   }, [refresh]);
+
+  useEffect(() => {
+    setLiveAgentRun(null);
+  }, [id]);
 
   useEffect(() => {
     if (!request) {
@@ -310,15 +351,41 @@ export default function RequestDetailPage() {
       nextParams.set("intent", "next");
       setSearchParams(nextParams, { replace: true });
     } catch (cause) {
-      if (cause instanceof ApiError) {
-        const detail =
-          typeof cause.detail === "string"
-            ? cause.detail
-            : JSON.stringify(cause.detail);
-        setActionError(`${name} refused: ${detail}`);
-      } else {
-        setActionError(`${name} failed: ${(cause as Error).message}`);
-      }
+      setActionError(actionErrorMessage(name, cause));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runSixAgentWorkflow(): Promise<void> {
+    const actionName = "Six-agent workflow";
+    const speed = normalizeGeminiRunDemoSpeed(searchParams.get("demoSpeed"));
+    const startedAt = Date.now();
+    setBusy(actionName);
+    setActionError(null);
+    setActionReceipt(null);
+    setLiveAgentRun({ status: "running", startedAt, speed });
+    window.setTimeout(() => {
+      scrollAndFocus(liveAgentRunRef.current, "center");
+    }, 80);
+
+    try {
+      const [result] = await Promise.all([
+        api.runAgentRail(id),
+        waitForGeminiDemo(speed),
+      ]);
+      const receipt = summarizeGuidedActionResult(actionName, result);
+      await refresh();
+      setActionReceipt(receipt);
+      setLiveAgentRun({ status: "complete", startedAt, speed, receipt });
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("tab");
+      nextParams.set("intent", "next");
+      setSearchParams(nextParams, { replace: true });
+    } catch (cause) {
+      const message = actionErrorMessage(actionName, cause);
+      setActionError(message);
+      setLiveAgentRun({ status: "error", startedAt, speed, errorMessage: message });
     } finally {
       setBusy(null);
     }
@@ -468,7 +535,7 @@ export default function RequestDetailPage() {
         void run("Validation", () => api.validate(id));
         return;
       case "runAgents":
-        void run("Six-agent workflow", () => api.runAgentRail(id));
+        void runSixAgentWorkflow();
         return;
       case "openEvidence":
         handleTabChange("evidence", { guidedIntent: true });
@@ -492,6 +559,11 @@ export default function RequestDetailPage() {
   }
 
   function handleLocateGuidedTarget() {
+    if (busy === "Six-agent workflow" && liveAgentRun) {
+      scrollAndFocus(liveAgentRunRef.current, "center");
+      return;
+    }
+
     if (guidance.primaryActionKind === "focusDecisionPanel") {
       focusDecisionPanel();
       return;
@@ -735,9 +807,21 @@ export default function RequestDetailPage() {
         <GuidedNextStepBar
           guidance={guidance}
           busyLabel={busy}
+          liveAgentRunStatus={liveAgentRun?.status ?? null}
           pulseLocateAction={stickyActionPulses}
           onLocateNext={handleLocateGuidedTarget}
         />
+
+        {liveAgentRun ? (
+          <LiveGeminiRunPanel
+            ref={liveAgentRunRef}
+            status={liveAgentRun.status}
+            startedAt={liveAgentRun.startedAt}
+            speed={liveAgentRun.speed}
+            receipt={liveAgentRun.receipt}
+            errorMessage={liveAgentRun.errorMessage}
+          />
+        ) : null}
 
         <GuidedReviewWorkbench
           guidance={guidance}
@@ -869,33 +953,50 @@ function guidedPrimaryLabel(guidance: RequestGuidance, busyLabel: string | null)
 function GuidedNextStepBar({
   guidance,
   busyLabel,
+  liveAgentRunStatus,
   pulseLocateAction,
   onLocateNext,
 }: {
   guidance: RequestGuidance;
   busyLabel: string | null;
+  liveAgentRunStatus: LiveGeminiRunStatus | null;
   pulseLocateAction: boolean;
   onLocateNext: () => void;
 }) {
+  const agentRunActive = busyLabel === "Six-agent workflow";
+  const nextStep = agentRunActive
+    ? "Gemini agents are running"
+    : liveAgentRunStatus === "complete"
+      ? "Review refreshed agent output"
+      : guidance.nextRequiredAction;
+  const expectation = agentRunActive
+    ? "Watch the live run. The page will refresh outputs when the run completes."
+    : liveAgentRunStatus === "complete"
+      ? "Open the persisted six-agent rail and resolve any review flags."
+      : guidance.resultExpectation;
   const locateLabel = shouldFocusGuidedPrimary(guidance.primaryActionKind)
     ? "Show next button"
     : guidance.primaryActionKind === "focusDecisionPanel"
       ? "Open decision controls"
       : "Open workspace";
+  const buttonLabel = agentRunActive ? "Show live run" : locateLabel;
   return (
     <section className="cf-next-step-bar" aria-label="Next guided action">
       <div className="cf-next-step-bar__copy">
         <span>Next step</span>
-        <strong>{guidance.nextRequiredAction}</strong>
-        <small>{guidance.resultExpectation}</small>
+        <strong>{nextStep}</strong>
+        <small>{expectation}</small>
       </div>
       <Button
         variant="tonal"
         className={pulseLocateAction ? "cf-button--guided-pulse" : undefined}
-        disabled={busyLabel !== null || guidance.primaryActionKind === "none"}
+        disabled={
+          (busyLabel !== null && !agentRunActive) ||
+          guidance.primaryActionKind === "none"
+        }
         onClick={onLocateNext}
       >
-        {busyLabel ? "Working..." : locateLabel}
+        {busyLabel && !agentRunActive ? "Working..." : buttonLabel}
       </Button>
     </section>
   );
