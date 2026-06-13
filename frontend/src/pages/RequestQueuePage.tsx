@@ -441,9 +441,11 @@ export default function RequestQueuePage() {
                   <button
                     key={request.legal_request_id}
                     type="button"
-                    aria-label={`Open request ${request.legal_request_id}. Next required action: ${guidance.nextRequiredAction}. ${guidance.queueSummary}.`}
+                    aria-label={`${guidance.queueActionLabel} for request ${request.legal_request_id}. Next required action: ${guidance.nextRequiredAction}. ${guidance.queueSummary}.`}
                     className="cf-queue__row"
-                    onClick={() => navigate(`/requests/${request.legal_request_id}`)}
+                    onClick={() =>
+                      navigate(`/requests/${request.legal_request_id}?intent=next`)
+                    }
                   >
                     <span className="cf-queue__topline">
                       <span className="cf-queue__identity">
@@ -517,7 +519,9 @@ export default function RequestQueuePage() {
                         {reviewRequirementFor(request, latestRuns)} ·{" "}
                         {auditStatusFor(request, latestRuns)}
                       </span>
-                      <span className="cf-queue__open">Open request</span>
+                      <span className="cf-queue__open">
+                        {guidance.queueActionLabel}
+                      </span>
                     </span>
                   </button>
                 );

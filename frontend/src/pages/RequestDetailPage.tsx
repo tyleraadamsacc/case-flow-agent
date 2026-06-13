@@ -22,7 +22,12 @@ import Chip from "../components/ui/Chip";
 import StatusBadge from "../components/ui/StatusBadge";
 import { toRailRuns } from "../lib/agentRunMapping";
 import {
+  summarizeGuidedActionResult,
+  type GuidedActionReceipt as GuidedActionReceiptModel,
+} from "../lib/guidedActionResult";
+import {
   buildRequestGuidance,
+  type RequestAgentCommandMode,
   type RequestGuidedActionKind,
   type RequestGuidance,
   type RequestWorkbenchTab,
@@ -58,24 +63,72 @@ export default function RequestDetailPage() {
     useState<FinalizationStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [supportingDataWarning, setSupportingDataWarning] = useState<string | null>(
+    null,
+  );
+  const [actionReceipt, setActionReceipt] =
+    useState<GuidedActionReceiptModel | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [activeTraceTarget, setActiveTraceTarget] =
     useState<SourceTraceTarget | null>(null);
-  const reviewRegionRef = useRef<HTMLElement | null>(null);
+  const reviewRegionRef = useRef<HTMLDivElement | null>(null);
+  const refreshSerialRef = useRef(0);
 
-  const refresh = useCallback(async () => {
-    const [detail, events, status] = await Promise.all([
-      api.getLegalRequest(id),
+  const refreshSupportingData = useCallback((refreshSerial: number) => {
+    void Promise.allSettled([
       api.auditTimeline(id),
-      api.finalizationStatus(id).catch(() => null),
-    ]);
-    setRequest(detail);
-    setAuditEvents(events);
-    setFinalizationStatus(status);
+      api.finalizationStatus(id),
+    ]).then(([auditResult, finalizationResult]) => {
+      if (refreshSerial !== refreshSerialRef.current) {
+        return;
+      }
+      const warnings: string[] = [];
+      if (auditResult.status === "fulfilled") {
+        setAuditEvents(auditResult.value);
+      } else {
+        setAuditEvents([]);
+        warnings.push("audit trail");
+      }
+      if (finalizationResult.status === "fulfilled") {
+        setFinalizationStatus(finalizationResult.value);
+      } else {
+        setFinalizationStatus(null);
+        warnings.push("approval readiness");
+      }
+      setSupportingDataWarning(
+        warnings.length > 0
+          ? `Could not refresh ${warnings.join(" and ")}. The request detail is shown, but supporting status may be incomplete.`
+          : null,
+      );
+    });
   }, [id]);
 
+  const refresh = useCallback(async () => {
+    const refreshSerial = refreshSerialRef.current + 1;
+    refreshSerialRef.current = refreshSerial;
+    const detail = await api.getLegalRequest(id);
+    if (refreshSerial !== refreshSerialRef.current) {
+      return;
+    }
+    setRequest(detail);
+    setLoadError(null);
+    setSupportingDataWarning(null);
+
+    refreshSupportingData(refreshSerial);
+  }, [id, refreshSupportingData]);
+
   useEffect(() => {
-    refresh().catch((cause: Error) => setLoadError(cause.message));
+    const timeout = window.setTimeout(() => {
+      setLoadError(
+        `Request ${id} did not load. Check that the matching backend is running.`,
+      );
+    }, 10000);
+
+    refresh()
+      .catch((cause: Error) => setLoadError(cause.message))
+      .finally(() => window.clearTimeout(timeout));
+
+    return () => window.clearTimeout(timeout);
   }, [refresh]);
 
   const auditActions = useMemo(
@@ -86,12 +139,19 @@ export default function RequestDetailPage() {
     [auditEvents],
   );
 
-  async function run(name: string, call: () => Promise<unknown>) {
+  async function run(name: string, call: () => Promise<unknown>): Promise<void> {
     setBusy(name);
     setActionError(null);
+    setActionReceipt(null);
     try {
-      await call();
+      const result = await call();
+      const receipt = summarizeGuidedActionResult(name, result);
       await refresh();
+      setActionReceipt(receipt);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("tab");
+      nextParams.delete("intent");
+      setSearchParams(nextParams, { replace: true });
     } catch (cause) {
       if (cause instanceof ApiError) {
         const detail =
@@ -108,11 +168,11 @@ export default function RequestDetailPage() {
   }
 
   function handleUpdated(updated: LegalRequest) {
+    const refreshSerial = refreshSerialRef.current + 1;
+    refreshSerialRef.current = refreshSerial;
     setRequest(updated);
-    api.auditTimeline(id).then(setAuditEvents).catch(() => undefined);
-    api.finalizationStatus(id)
-      .then(setFinalizationStatus)
-      .catch(() => setFinalizationStatus(null));
+    setSupportingDataWarning(null);
+    refreshSupportingData(refreshSerial);
   }
 
   if (loadError) {
@@ -137,6 +197,7 @@ export default function RequestDetailPage() {
     );
   }
 
+  const currentRequest = request;
   const state = request.workflow_state;
   const hasRuns = Object.keys(request.agent_runs).length > 0;
   const canExtract = state === "request_received";
@@ -180,13 +241,33 @@ export default function RequestDetailPage() {
     blockingFindings,
   });
   const tabParam = searchParams.get("tab");
+  const intentParam = searchParams.get("intent");
+  const decisionIntent = intentParam === "decision";
+  const decisionPanelCanLead =
+    guidance.primaryActionKind === "focusDecisionPanel" ||
+    guidance.reviewPanelMode === "routeDecision" ||
+    guidance.reviewPanelMode === "finalApproval" ||
+    guidance.reviewPanelMode === "complete";
+  const reviewPanelActive =
+    (decisionPanelCanLead || decisionIntent) && !isRequestDetailTab(tabParam);
   const selectedTab: RequestDetailTab = isRequestDetailTab(tabParam)
     ? tabParam
+    : decisionIntent
+      ? "overview"
+    : intentParam === "next"
+      ? guidance.recommendedTab
     : guidance.recommendedTab;
+  const activeWorkspaceLabel = reviewPanelActive
+    ? "Human decision controls"
+    : REQUEST_TABS.find((tab) => tab.id === selectedTab)?.label ?? "Review workspace";
+  const activeWorkspaceHelper = reviewPanelActive
+    ? "Record the human route, escalation, QA handoff, or final approval when the checklist is ready."
+    : "Use this supporting workspace to finish the current guided task.";
 
   function handleTabChange(tab: RequestDetailTab) {
     const nextParams = new URLSearchParams(searchParams);
-    if (tab === guidance.recommendedTab) {
+    nextParams.delete("intent");
+    if (!decisionPanelCanLead && tab === guidance.recommendedTab) {
       nextParams.delete("tab");
     } else {
       nextParams.set("tab", tab);
@@ -195,11 +276,17 @@ export default function RequestDetailPage() {
   }
 
   function focusDecisionPanel() {
-    reviewRegionRef.current?.scrollIntoView({
-      block: "nearest",
-      behavior: "smooth",
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("tab");
+    nextParams.set("intent", "decision");
+    setSearchParams(nextParams, { replace: true });
+    window.requestAnimationFrame(() => {
+      reviewRegionRef.current?.scrollIntoView({
+        block: "nearest",
+        behavior: "smooth",
+      });
+      reviewRegionRef.current?.focus({ preventScroll: true });
     });
-    reviewRegionRef.current?.focus({ preventScroll: true });
   }
 
   function guidedActionDisabled(kind: RequestGuidedActionKind): boolean {
@@ -214,6 +301,15 @@ export default function RequestDetailPage() {
     }
     if (kind === "runAgents") {
       return !canRunRail;
+    }
+    if (
+      kind === "openEvidence" ||
+      kind === "openAgents" ||
+      kind === "openDrafts" ||
+      kind === "openAudit" ||
+      kind === "focusDecisionPanel"
+    ) {
+      return false;
     }
     return kind === "none";
   }
@@ -274,6 +370,126 @@ export default function RequestDetailPage() {
     return null;
   }
 
+  function renderReviewPanel() {
+    return (
+      <ReviewPanel
+        request={currentRequest}
+        auditEvents={auditEvents}
+        reviewPanelMode={guidance.reviewPanelMode}
+        onUpdated={handleUpdated}
+        onActionResult={(notice, updated) =>
+          setActionReceipt({
+            actionName: "Human decision",
+            title: "Human decision recorded",
+            summary: `${notice} Current state: ${humanizeToken(
+              updated.workflow_state,
+            )}.`,
+            workflowState: updated.workflow_state,
+            auditSummaries: [],
+          })
+        }
+      />
+    );
+  }
+
+  function renderSelectedWorkspace() {
+    if (selectedTab === "overview") {
+      return (
+        <OverviewTab
+          request={currentRequest}
+          completedAgents={completedAgents}
+          reviewFlags={reviewFlags}
+          blockedDeficiency={blockedDeficiency}
+          sourceBackedIdentifiers={sourceBackedIdentifiers}
+          blockingFindings={blockingFindings}
+          onOpenEvidence={() => handleTabChange("evidence")}
+          onOpenAgents={() => handleTabChange("agents")}
+          onOpenDrafts={() => handleTabChange("drafts")}
+        />
+      );
+    }
+
+    if (selectedTab === "evidence") {
+      return (
+        <section
+          aria-labelledby="request-tab-evidence"
+          className="cf-request-tab-panel"
+          id="request-panel-evidence"
+          role="tabpanel"
+        >
+          <div className="cf-detail-grid cf-detail-grid--evidence">
+            <SourceDocumentPanel
+              request={currentRequest}
+              activeTraceTarget={activeTraceTarget}
+            />
+            <ExtractedFieldsPanel
+              request={currentRequest}
+              onUpdated={handleUpdated}
+              onTraceTarget={setActiveTraceTarget}
+              resolveTraceTarget={resolveTraceTarget}
+            />
+          </div>
+        </section>
+      );
+    }
+
+    if (selectedTab === "agents") {
+      return (
+        <AgentsTab
+          request={currentRequest}
+          auditEvents={auditEvents}
+          finalizationStatus={finalizationStatus}
+          hasRuns={hasRuns}
+          runs={toRailRuns(
+            currentRequest.agent_runs,
+            auditActions,
+            currentRequest.agent_run_reviews,
+          )}
+          onOpenSourceTrace={(sourceSpan, fallbackTerms = []) =>
+            setActiveTraceTarget(resolveTraceTarget(sourceSpan, fallbackTerms))
+          }
+          onAcceptAgent={(agentId) =>
+            run("Agent acceptance", () =>
+              api.acceptAgentRun(
+                id,
+                agentId,
+                "Accepted from the Six-Agent Workflow Rail.",
+              ),
+            )
+          }
+          onRerunAgent={(agentId, instruction) =>
+            run("Agent redraft", () =>
+              api.rerunAgent(id, agentId, instruction || undefined),
+            )
+          }
+          agentCommandMode={guidance.agentCommandMode}
+        />
+      );
+    }
+
+    if (selectedTab === "drafts") {
+      return (
+        <DraftsTab
+          request={currentRequest}
+          busy={busy}
+          hasRuns={hasRuns}
+          blockedDeficiency={blockedDeficiency}
+          onDraftPackage={() =>
+            run("Package drafting", () => api.draftProductionPackage(id))
+          }
+          onDraftDeficiency={() =>
+            run("Deficiency response drafting", () =>
+              api.draftDeficiencyResponse(id),
+            )
+          }
+          onUpdated={handleUpdated}
+        />
+      );
+    }
+
+    return <AuditTab auditEvents={auditEvents} />;
+  }
+
   return (
     <ConsoleShell title={`Request ${request.legal_request_id}`}>
       <div className="cf-request-command">
@@ -295,32 +511,6 @@ export default function RequestDetailPage() {
               Human review controls every route, package, and final audit
               decision.
             </p>
-          </div>
-          <div className="cf-request-header__actions" aria-label="Request actions">
-            <Button
-              variant={canExtract ? "filled" : "tonal"}
-              disabled={!canExtract || busy !== null}
-              onClick={() => run("Extraction", () => api.extract(id))}
-            >
-              {busy === "Extraction" ? "Extracting..." : "Extract request"}
-            </Button>
-            <Button
-              variant={canValidate ? "filled" : "tonal"}
-              disabled={!canValidate || busy !== null}
-              onClick={() => run("Validation", () => api.validate(id))}
-            >
-              {busy === "Validation" ? "Validating..." : "Validate request"}
-            </Button>
-            <Button
-              variant={canRunRail && !hasRuns ? "filled" : "tonal"}
-              glow={canRunRail && !hasRuns}
-              disabled={!canRunRail || busy !== null}
-              onClick={() => run("Six-agent workflow", () => api.runAgentRail(id))}
-            >
-              {busy === "Six-agent workflow"
-                ? "Running six agents..."
-                : "Run six-agent workflow"}
-            </Button>
           </div>
           <div className="cf-request-header__progress">
             <WorkflowProgress state={state} />
@@ -364,120 +554,79 @@ export default function RequestDetailPage() {
           {actionError ? <p className="cf-review__error">{actionError}</p> : null}
         </header>
 
+        {supportingDataWarning ? (
+          <p className="cf-request-support-warning" role="status">
+            {supportingDataWarning}
+          </p>
+        ) : null}
+
         <GuidedReviewWorkbench
           guidance={guidance}
+          actionReceipt={actionReceipt}
           primaryActionDisabled={guidedActionDisabled(guidance.primaryActionKind)}
-          onPrimaryAction={() => handleGuidedAction(guidance.primaryActionKind)}
-          onStepSelect={(tab) => handleTabChange(tab)}
-          onOpenEvidence={() => handleTabChange("evidence")}
-          onOpenAgents={() => handleTabChange("agents")}
-          onOpenDrafts={() => handleTabChange("drafts")}
-          onOpenAudit={() => handleTabChange("audit")}
+          busyLabel={busy}
+          onAction={handleGuidedAction}
+          onStepSelect={(step) => {
+            if (step.status !== "pending") {
+              handleTabChange(step.tab);
+            }
+          }}
         />
 
-        <section className="cf-request-workspace" aria-label="Request review workspace">
-          <div className="cf-request-workspace__main">
-            <RequestTabNav selectedTab={selectedTab} onTabChange={handleTabChange} />
-            <div className="cf-request-tab-panels">
-              {selectedTab === "overview" ? (
-                <OverviewTab
-                  request={request}
-                  completedAgents={completedAgents}
-                  reviewFlags={reviewFlags}
-                  blockedDeficiency={blockedDeficiency}
-                  sourceBackedIdentifiers={sourceBackedIdentifiers}
-                  blockingFindings={blockingFindings}
-                  onOpenEvidence={() => handleTabChange("evidence")}
-                  onOpenAgents={() => handleTabChange("agents")}
-                  onOpenDrafts={() => handleTabChange("drafts")}
-                />
-              ) : null}
-              {selectedTab === "evidence" ? (
-                <section
-                  aria-labelledby="request-tab-evidence"
-                  className="cf-request-tab-panel"
-                  id="request-panel-evidence"
-                  role="tabpanel"
-                >
-                  <div className="cf-detail-grid cf-detail-grid--evidence">
-                    <SourceDocumentPanel
-                      request={request}
-                      activeTraceTarget={activeTraceTarget}
-                    />
-                    <ExtractedFieldsPanel
-                      request={request}
-                      onUpdated={handleUpdated}
-                      onTraceTarget={setActiveTraceTarget}
-                      resolveTraceTarget={resolveTraceTarget}
-                    />
-                  </div>
-                </section>
-              ) : null}
-              {selectedTab === "agents" ? (
-                <AgentsTab
-                  request={request}
-                  auditEvents={auditEvents}
-                  finalizationStatus={finalizationStatus}
-                  hasRuns={hasRuns}
-                  runs={toRailRuns(
-                    request.agent_runs,
-                    auditActions,
-                    request.agent_run_reviews,
-                  )}
-                  onOpenSourceTrace={(sourceSpan, fallbackTerms = []) =>
-                    setActiveTraceTarget(resolveTraceTarget(sourceSpan, fallbackTerms))
-                  }
-                  onAcceptAgent={(agentId) =>
-                    run("Agent acceptance", () =>
-                      api.acceptAgentRun(
-                        id,
-                        agentId,
-                        "Accepted from the Six-Agent Workflow Rail.",
-                      ),
-                    )
-                  }
-                  onRerunAgent={(agentId, instruction) =>
-                    run("Agent redraft", () =>
-                      api.rerunAgent(id, agentId, instruction || undefined),
-                    )
-                  }
-                />
-              ) : null}
-              {selectedTab === "drafts" ? (
-                <DraftsTab
-                  request={request}
-                  busy={busy}
-                  hasRuns={hasRuns}
-                  blockedDeficiency={blockedDeficiency}
-                  onDraftPackage={() =>
-                    run("Package drafting", () => api.draftProductionPackage(id))
-                  }
-                  onDraftDeficiency={() =>
-                    run("Deficiency response drafting", () =>
-                      api.draftDeficiencyResponse(id),
-                    )
-                  }
-                  onUpdated={handleUpdated}
-                />
-              ) : null}
-              {selectedTab === "audit" ? (
-                <AuditTab auditEvents={auditEvents} />
-              ) : null}
+        <section className="cf-guided-stage" aria-label="Request review workspace">
+          <div className="cf-guided-stage__header">
+            <div>
+              <span className="cf-guided-workbench__eyebrow">Current workspace</span>
+              <h2>{activeWorkspaceLabel}</h2>
+              <p>{activeWorkspaceHelper}</p>
             </div>
+            {reviewPanelActive ? (
+              <Chip tone="blue" dot>
+                Decision step
+              </Chip>
+            ) : null}
           </div>
-          <aside
-            className="cf-request-workspace__review"
-            aria-label="Human review panel"
-            ref={reviewRegionRef}
-            tabIndex={-1}
+          {reviewPanelActive ? (
+            <div
+              className="cf-guided-support-links"
+              aria-label="Supporting workspaces"
+            >
+              {REQUEST_TABS.map((tab) => (
+                <Button
+                  key={tab.id}
+                  variant="outlined"
+                  size="sm"
+                  onClick={() => handleTabChange(tab.id)}
+                >
+                  {tab.label}
+                </Button>
+              ))}
+            </div>
+          ) : (
+            <RequestTabNav selectedTab={selectedTab} onTabChange={handleTabChange} />
+          )}
+          <div
+            className="cf-guided-stage__body"
+            ref={reviewPanelActive ? reviewRegionRef : undefined}
+            tabIndex={reviewPanelActive ? -1 : undefined}
           >
-            <ReviewPanel
-              request={request}
-              auditEvents={auditEvents}
-              onUpdated={handleUpdated}
-            />
-          </aside>
+            {reviewPanelActive ? renderReviewPanel() : renderSelectedWorkspace()}
+          </div>
         </section>
+
+        {!reviewPanelActive ? (
+          <details
+            className="cf-guided-disclosure cf-guided-decision-disclosure"
+          >
+            <summary>
+              <span>Human decision controls</span>
+              <small>
+                Approve, request changes, escalate, send to QA, or record final approval.
+              </small>
+            </summary>
+            <div className="cf-guided-disclosure__body">{renderReviewPanel()}</div>
+          </details>
+        ) : null}
       </div>
     </ConsoleShell>
   );
@@ -512,111 +661,201 @@ function RequestTabNav({
 
 function GuidedReviewWorkbench({
   guidance,
+  actionReceipt,
   primaryActionDisabled,
-  onPrimaryAction,
+  busyLabel,
+  onAction,
   onStepSelect,
-  onOpenEvidence,
-  onOpenAgents,
-  onOpenDrafts,
-  onOpenAudit,
 }: {
   guidance: RequestGuidance;
+  actionReceipt: GuidedActionReceiptModel | null;
   primaryActionDisabled: boolean;
-  onPrimaryAction: () => void;
-  onStepSelect: (tab: RequestWorkbenchTab) => void;
-  onOpenEvidence: () => void;
-  onOpenAgents: () => void;
-  onOpenDrafts: () => void;
-  onOpenAudit: () => void;
+  busyLabel: string | null;
+  onAction: (kind: RequestGuidedActionKind) => void;
+  onStepSelect: (step: RequestGuidance["steps"][number]) => void;
 }) {
+  const primaryChangesState = ["extract", "validate", "runAgents"].includes(
+    guidance.primaryActionKind,
+  );
+  const primaryBusy =
+    busyLabel === "Extraction" ||
+    busyLabel === "Validation" ||
+    busyLabel === "Six-agent workflow";
+  const primaryLabel = primaryBusy
+    ? busyLabel === "Extraction"
+      ? "Extracting..."
+      : busyLabel === "Validation"
+        ? "Validating..."
+        : "Running six agents..."
+    : guidance.primaryActionLabel;
+  const primaryBlocker = guidance.blockerTasks[0];
+
   return (
     <section
       className="cf-guided-workbench"
       aria-labelledby="guided-review-heading"
     >
-      <div className="cf-guided-workbench__rail">
-        <span className="cf-guided-workbench__eyebrow">Review path</span>
-        <ol aria-label="Guided request steps" className="cf-guided-steps">
-          {guidance.steps.map((step, index) => (
-            <li key={step.id}>
-              <button
-                type="button"
-                className={`cf-guided-step cf-guided-step--${step.status}`}
-                aria-current={step.id === guidance.currentStepId ? "step" : undefined}
-                onClick={() => onStepSelect(step.tab)}
-              >
-                <span className="cf-guided-step__index">{index + 1}</span>
-                <span className="cf-guided-step__copy">
-                  <strong>{step.label}</strong>
-                  <small>{step.description}</small>
-                </span>
-                <Chip tone={stepTone(step.status)} dot={step.status !== "pending"}>
-                  {stepStatusLabel(step.status)}
-                </Chip>
-              </button>
-            </li>
-          ))}
-        </ol>
-      </div>
-
       <div className="cf-guided-workbench__focus">
         <span className="cf-guided-workbench__eyebrow">Next required action</span>
         <h2 id="guided-review-heading">{guidance.nextRequiredAction}</h2>
         <p>{guidance.nextActionReason}</p>
+        <p className="cf-guided-expectation">{guidance.resultExpectation}</p>
+        {primaryBlocker ? (
+          <div className="cf-guided-blocker-callout">
+            <Chip tone="red" dot>
+              {primaryBlocker.label}
+            </Chip>
+            <div>
+              <strong>{primaryBlocker.detail}</strong>
+              <Button
+                size="sm"
+                variant="text"
+                onClick={() => onAction(primaryBlocker.actionKind)}
+              >
+                {primaryBlocker.actionLabel}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        {actionReceipt ? (
+          <GuidedActionReceipt
+            receipt={actionReceipt}
+            nextAction={guidance.nextRequiredAction}
+          />
+        ) : null}
         <ul className="cf-guided-checklist" aria-label="Current step checklist">
           {guidance.checklist.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
+        {guidance.disabledReasons.length > 0 ? (
+          <ul className="cf-guided-disabled-reasons" aria-label="Disabled action reasons">
+            {guidance.disabledReasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        ) : null}
         <div className="cf-guided-workbench__actions">
           <Button
-            variant="filled"
-            glow={!primaryActionDisabled}
+            variant={primaryChangesState ? "filled" : "tonal"}
+            glow={primaryChangesState && !primaryActionDisabled}
             disabled={primaryActionDisabled}
-            onClick={onPrimaryAction}
+            onClick={() => onAction(guidance.primaryActionKind)}
           >
-            {guidance.primaryActionLabel}
+            {primaryLabel}
           </Button>
-          <Button variant="outlined" onClick={onOpenEvidence}>
-            Evidence & fields
-          </Button>
-          <Button variant="outlined" onClick={onOpenAgents}>
-            Agent outputs
-          </Button>
+          {guidance.secondaryActions.map((action) => (
+            <Button
+              key={`${action.kind}-${action.label}`}
+              variant="outlined"
+              onClick={() => onAction(action.kind)}
+            >
+              {action.label}
+            </Button>
+          ))}
         </div>
       </div>
 
-      <div className="cf-guided-workbench__support">
-        <span className="cf-guided-workbench__eyebrow">Approval gates</span>
-        {guidance.blockers.length > 0 ? (
-          <ul className="cf-guided-blockers" aria-label="Guided review blockers">
-            {guidance.blockers.map((blocker) => (
-              <li key={blocker}>
-                <Chip tone="red" dot>
-                  Blocked
-                </Chip>
-                <span>{blocker}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="cf-guided-ready">
-            <Chip tone="green" dot>
-              No blocking gate
-            </Chip>
-            <p>Use the decision panel when the current step checks are complete.</p>
+      <div className="cf-guided-disclosures">
+        <details className="cf-guided-disclosure">
+          <summary>
+            <span>Workflow map</span>
+            <small>See every request step and jump to completed workspaces.</small>
+          </summary>
+          <div className="cf-guided-disclosure__body">
+            <ol aria-label="Guided request steps" className="cf-guided-steps">
+              {guidance.steps.map((step, index) => (
+                <li key={step.id}>
+                  <button
+                    type="button"
+                    className={`cf-guided-step cf-guided-step--${step.status}`}
+                    aria-current={step.id === guidance.currentStepId ? "step" : undefined}
+                    disabled={step.status === "pending"}
+                    onClick={() => onStepSelect(step)}
+                  >
+                    <span className="cf-guided-step__index">{index + 1}</span>
+                    <span className="cf-guided-step__copy">
+                      <strong>{step.label}</strong>
+                      <small>{step.description}</small>
+                    </span>
+                    <Chip tone={stepTone(step.status)} dot={step.status !== "pending"}>
+                      {stepStatusLabel(step.status)}
+                    </Chip>
+                  </button>
+                </li>
+              ))}
+            </ol>
           </div>
-        )}
-        <div className="cf-guided-support-actions">
-          <Button size="sm" variant="text" onClick={onOpenDrafts}>
-            Draft package
-          </Button>
-          <Button size="sm" variant="text" onClick={onOpenAudit}>
-            Audit trail
-          </Button>
-        </div>
+        </details>
+
+        <details className="cf-guided-disclosure">
+          <summary>
+            <span>
+              {guidance.blockerTasks.length > 0 ? "Issue details" : "Approval gates"}
+            </span>
+            <small>
+              {guidance.blockerTasks.length > 0
+                ? `${guidance.blockerTasks.length} item${
+                    guidance.blockerTasks.length === 1 ? "" : "s"
+                  } must be cleared.`
+                : "No blocking gate is active."}
+            </small>
+          </summary>
+          <div className="cf-guided-disclosure__body">
+            {guidance.blockerTasks.length > 0 ? (
+              <ul className="cf-guided-blockers" aria-label="Guided review blockers">
+                {guidance.blockerTasks.map((blocker) => (
+                  <li key={blocker.detail}>
+                    <Chip tone="red" dot>
+                      {blocker.label}
+                    </Chip>
+                    <span>{blocker.detail}</span>
+                    <Button
+                      size="sm"
+                      variant="text"
+                      onClick={() => onAction(blocker.actionKind)}
+                    >
+                      {blocker.actionLabel}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="cf-guided-ready">
+                <Chip tone="green" dot>
+                  No blocking gate
+                </Chip>
+                <p>Use the decision controls when the current step checks are complete.</p>
+              </div>
+            )}
+          </div>
+        </details>
       </div>
     </section>
+  );
+}
+
+function GuidedActionReceipt({
+  receipt,
+  nextAction,
+}: {
+  receipt: GuidedActionReceiptModel;
+  nextAction: string;
+}) {
+  return (
+    <div className="cf-guided-receipt" role="status" aria-live="polite">
+      <Chip tone="green" dot>
+        Result
+      </Chip>
+      <div>
+        <strong>{receipt.title}</strong>
+        <p>{receipt.summary}</p>
+        {receipt.auditSummaries.slice(0, 2).map((summary) => (
+          <small key={summary}>Audit: {summary}</small>
+        ))}
+        <small>Next: {nextAction}</small>
+      </div>
+    </div>
   );
 }
 
@@ -833,6 +1072,7 @@ function AgentsTab({
   finalizationStatus,
   hasRuns,
   runs,
+  agentCommandMode,
   onOpenSourceTrace,
   onAcceptAgent,
   onRerunAgent,
@@ -842,12 +1082,13 @@ function AgentsTab({
   finalizationStatus: FinalizationStatus | null;
   hasRuns: boolean;
   runs: ReturnType<typeof toRailRuns>;
+  agentCommandMode: RequestAgentCommandMode;
   onOpenSourceTrace: (
     sourceSpan: string | null | undefined,
     fallbackTerms?: string[],
   ) => void;
-  onAcceptAgent: (agentId: string) => void;
-  onRerunAgent: (agentId: string, instruction: string) => void;
+  onAcceptAgent: (agentId: string) => Promise<void> | void;
+  onRerunAgent: (agentId: string, instruction: string) => Promise<void> | void;
 }) {
   return (
     <section
@@ -874,6 +1115,7 @@ function AgentsTab({
         onOpenSourceTrace={onOpenSourceTrace}
         onAcceptAgent={onAcceptAgent}
         onRerunAgent={onRerunAgent}
+        agentCommandMode={agentCommandMode}
       />
     </section>
   );

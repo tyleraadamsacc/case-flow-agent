@@ -69,7 +69,7 @@ describe("RequestQueuePage", () => {
     expect(screen.getByText("2 of 2 requests")).toBeInTheDocument();
     expect(
       screen.getByRole("button", {
-        name: /Open request LER-2026-004821.*Next required action: Resolve review flags/,
+        name: /Open agent outputs for request LER-2026-004821.*Next required action: Resolve review flags/,
       }),
     ).toBeInTheDocument();
   });
@@ -213,7 +213,9 @@ describe("RequestQueuePage", () => {
     );
 
     fireEvent.click(
-      await screen.findByRole("button", { name: /Open request LER-2026-004821/ }),
+      await screen.findByRole("button", {
+        name: /Open to run six-agent workflow for request LER-2026-004821/,
+      }),
     );
 
     expect(await screen.findByText("Request detail route")).toBeInTheDocument();
