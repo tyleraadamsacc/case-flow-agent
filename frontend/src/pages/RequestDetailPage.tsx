@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
 import { api, ApiError } from "../api/client";
@@ -16,13 +23,26 @@ import ReviewPanel from "../components/request/ReviewPanel";
 import SourceDocumentPanel from "../components/request/SourceDocumentPanel";
 import type { SourceTraceTarget } from "../components/request/SourceDocumentPanel";
 import WorkflowProgress from "../components/request/WorkflowProgress";
+import LiveGeminiRunPanel, {
+  type LiveGeminiRunStatus,
+} from "../components/agents/LiveGeminiRunPanel";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import Chip from "../components/ui/Chip";
 import StatusBadge from "../components/ui/StatusBadge";
 import { toRailRuns } from "../lib/agentRunMapping";
 import {
+  geminiRunDemoTotalMs,
+  normalizeGeminiRunDemoSpeed,
+  type GeminiRunDemoSpeed,
+} from "../lib/geminiRunDemo";
+import {
+  summarizeGuidedActionResult,
+  type GuidedActionReceipt as GuidedActionReceiptModel,
+} from "../lib/guidedActionResult";
+import {
   buildRequestGuidance,
+  type RequestAgentCommandMode,
   type RequestGuidedActionKind,
   type RequestGuidance,
   type RequestWorkbenchTab,
@@ -36,6 +56,14 @@ import {
 
 type RequestDetailTab = RequestWorkbenchTab;
 
+interface LiveAgentRunState {
+  status: LiveGeminiRunStatus;
+  startedAt: number;
+  speed: GeminiRunDemoSpeed;
+  receipt?: GuidedActionReceiptModel | null;
+  errorMessage?: string | null;
+}
+
 const REQUEST_TABS: Array<{ id: RequestDetailTab; label: string }> = [
   { id: "overview", label: "Review brief" },
   { id: "evidence", label: "Evidence & fields" },
@@ -43,6 +71,97 @@ const REQUEST_TABS: Array<{ id: RequestDetailTab; label: string }> = [
   { id: "drafts", label: "Draft package" },
   { id: "audit", label: "Audit trail" },
 ];
+
+function tabForGuidedAction(
+  kind: RequestGuidedActionKind,
+): RequestDetailTab | null {
+  switch (kind) {
+    case "openEvidence":
+      return "evidence";
+    case "openAgents":
+      return "agents";
+    case "openDrafts":
+      return "drafts";
+    case "openAudit":
+      return "audit";
+    default:
+      return null;
+  }
+}
+
+function shouldFocusGuidedPrimary(kind: RequestGuidedActionKind) {
+  return kind === "extract" || kind === "validate" || kind === "runAgents";
+}
+
+function scrollAndFocus(target: HTMLElement | null, block: ScrollLogicalPosition) {
+  if (!target) {
+    return;
+  }
+  const reduceMotion =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  target.scrollIntoView?.({
+    block,
+    behavior: reduceMotion ? "auto" : "smooth",
+  });
+  target.focus({ preventScroll: true });
+}
+
+function waitForGeminiDemo(speed: GeminiRunDemoSpeed) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, geminiRunDemoTotalMs(speed));
+  });
+}
+
+function actionErrorMessage(name: string, cause: unknown) {
+  if (cause instanceof ApiError) {
+    const detail =
+      typeof cause.detail === "string"
+        ? cause.detail
+        : JSON.stringify(cause.detail);
+    return `${name} refused: ${detail}`;
+  }
+  return `${name} failed: ${(cause as Error).message}`;
+}
+
+function buildGuidanceForRequest(
+  request: LegalRequest,
+  auditEvents: AuditEvent[],
+  finalizationStatus: FinalizationStatus | null,
+) {
+  const completedAgents = Object.values(request.agent_runs).filter(
+    (run) => run.status === "complete",
+  ).length;
+  const reviewFlags = [
+    ...(request.classification?.review_reasons ?? []),
+    ...Object.values(request.agent_runs).flatMap((run) => run.risk_flags),
+    ...request.deficiency_findings
+      .filter((finding) => finding.severity === "blocking")
+      .map((finding) => finding.code),
+  ];
+  const sourceBackedIdentifiers = request.subject_identifiers.filter((identifier) =>
+    Boolean(identifier.source_span),
+  ).length;
+  const blockingFindings = request.deficiency_findings.filter(
+    (finding) => finding.severity === "blocking",
+  ).length;
+
+  return {
+    completedAgents,
+    reviewFlags,
+    sourceBackedIdentifiers,
+    blockingFindings,
+    guidance: buildRequestGuidance({
+      request,
+      auditEvents,
+      finalizationStatus,
+      completedAgents,
+      reviewFlags,
+      sourceBackedIdentifiers,
+      blockingFindings,
+    }),
+  };
+}
 
 /** Request Detail — the hero screen (plan §13): source document with
  * extracted spans, structured fields, the live Six-Agent Workflow Rail,
@@ -58,25 +177,157 @@ export default function RequestDetailPage() {
     useState<FinalizationStatus | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [supportingDataWarning, setSupportingDataWarning] = useState<string | null>(
+    null,
+  );
+  const [actionReceipt, setActionReceipt] =
+    useState<GuidedActionReceiptModel | null>(null);
+  const [liveAgentRun, setLiveAgentRun] = useState<LiveAgentRunState | null>(
+    null,
+  );
   const [busy, setBusy] = useState<string | null>(null);
   const [activeTraceTarget, setActiveTraceTarget] =
     useState<SourceTraceTarget | null>(null);
-  const reviewRegionRef = useRef<HTMLElement | null>(null);
+  const reviewRegionRef = useRef<HTMLDivElement | null>(null);
+  const guidedPrimaryActionRef = useRef<HTMLButtonElement | null>(null);
+  const guidedStageRef = useRef<HTMLElement | null>(null);
+  const liveAgentRunRef = useRef<HTMLElement | null>(null);
+  const lastGuidedTargetRef = useRef<string | null>(null);
+  const refreshSerialRef = useRef(0);
+  const searchParamString = searchParams.toString();
+
+  const refreshSupportingData = useCallback((refreshSerial: number) => {
+    void Promise.allSettled([
+      api.auditTimeline(id),
+      api.finalizationStatus(id),
+    ]).then(([auditResult, finalizationResult]) => {
+      if (refreshSerial !== refreshSerialRef.current) {
+        return;
+      }
+      const warnings: string[] = [];
+      if (auditResult.status === "fulfilled") {
+        setAuditEvents(auditResult.value);
+      } else {
+        setAuditEvents([]);
+        warnings.push("audit trail");
+      }
+      if (finalizationResult.status === "fulfilled") {
+        setFinalizationStatus(finalizationResult.value);
+      } else {
+        setFinalizationStatus(null);
+        warnings.push("approval readiness");
+      }
+      setSupportingDataWarning(
+        warnings.length > 0
+          ? `Could not refresh ${warnings.join(" and ")}. The request detail is shown, but supporting status may be incomplete.`
+          : null,
+      );
+    });
+  }, [id]);
 
   const refresh = useCallback(async () => {
-    const [detail, events, status] = await Promise.all([
-      api.getLegalRequest(id),
-      api.auditTimeline(id),
-      api.finalizationStatus(id).catch(() => null),
-    ]);
+    const refreshSerial = refreshSerialRef.current + 1;
+    refreshSerialRef.current = refreshSerial;
+    const detail = await api.getLegalRequest(id);
+    if (refreshSerial !== refreshSerialRef.current) {
+      return;
+    }
     setRequest(detail);
-    setAuditEvents(events);
-    setFinalizationStatus(status);
+    setLoadError(null);
+    setSupportingDataWarning(null);
+
+    refreshSupportingData(refreshSerial);
+  }, [id, refreshSupportingData]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setLoadError(
+        `Request ${id} did not load. Check that the matching backend is running.`,
+      );
+    }, 10000);
+
+    refresh()
+      .catch((cause: Error) => setLoadError(cause.message))
+      .finally(() => window.clearTimeout(timeout));
+
+    return () => window.clearTimeout(timeout);
+  }, [refresh]);
+
+  useEffect(() => {
+    setLiveAgentRun(null);
   }, [id]);
 
   useEffect(() => {
-    refresh().catch((cause: Error) => setLoadError(cause.message));
-  }, [refresh]);
+    if (!request) {
+      return;
+    }
+
+    const intent = searchParams.get("intent");
+    if (intent !== "next" && intent !== "decision") {
+      return;
+    }
+
+    const { guidance: nextGuidance } = buildGuidanceForRequest(
+      request,
+      auditEvents,
+      finalizationStatus,
+    );
+
+    if (intent === "next") {
+      if (nextGuidance.primaryActionKind === "focusDecisionPanel") {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.delete("tab");
+        nextParams.set("intent", "decision");
+        setSearchParams(nextParams, { replace: true });
+        return;
+      }
+
+      const targetTab = tabForGuidedAction(nextGuidance.primaryActionKind);
+      if (targetTab && searchParams.get("tab") !== targetTab) {
+        const nextParams = new URLSearchParams(searchParams);
+        nextParams.set("intent", "next");
+        nextParams.set("tab", targetTab);
+        setSearchParams(nextParams, { replace: true });
+        return;
+      }
+    }
+
+    const targetKey = [
+      request.legal_request_id,
+      intent,
+      nextGuidance.primaryActionKind,
+      searchParams.get("tab") ?? "",
+      nextGuidance.nextRequiredAction,
+    ].join(":");
+    if (lastGuidedTargetRef.current === targetKey) {
+      return;
+    }
+    lastGuidedTargetRef.current = targetKey;
+
+    window.setTimeout(() => {
+      if (
+        intent === "decision" ||
+        nextGuidance.primaryActionKind === "focusDecisionPanel"
+      ) {
+        scrollAndFocus(reviewRegionRef.current, "center");
+        return;
+      }
+
+      if (shouldFocusGuidedPrimary(nextGuidance.primaryActionKind)) {
+        scrollAndFocus(guidedPrimaryActionRef.current, "center");
+        return;
+      }
+
+      scrollAndFocus(guidedStageRef.current, "start");
+    }, 160);
+  }, [
+    auditEvents,
+    finalizationStatus,
+    request,
+    searchParamString,
+    searchParams,
+    setSearchParams,
+  ]);
 
   const auditActions = useMemo(
     () =>
@@ -86,33 +337,66 @@ export default function RequestDetailPage() {
     [auditEvents],
   );
 
-  async function run(name: string, call: () => Promise<unknown>) {
+  async function run(name: string, call: () => Promise<unknown>): Promise<void> {
     setBusy(name);
     setActionError(null);
+    setActionReceipt(null);
     try {
-      await call();
+      const result = await call();
+      const receipt = summarizeGuidedActionResult(name, result);
       await refresh();
+      setActionReceipt(receipt);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("tab");
+      nextParams.set("intent", "next");
+      setSearchParams(nextParams, { replace: true });
     } catch (cause) {
-      if (cause instanceof ApiError) {
-        const detail =
-          typeof cause.detail === "string"
-            ? cause.detail
-            : JSON.stringify(cause.detail);
-        setActionError(`${name} refused: ${detail}`);
-      } else {
-        setActionError(`${name} failed: ${(cause as Error).message}`);
-      }
+      setActionError(actionErrorMessage(name, cause));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runSixAgentWorkflow(): Promise<void> {
+    const actionName = "Six-agent workflow";
+    const speed = normalizeGeminiRunDemoSpeed(searchParams.get("demoSpeed"));
+    const startedAt = Date.now();
+    setBusy(actionName);
+    setActionError(null);
+    setActionReceipt(null);
+    setLiveAgentRun({ status: "running", startedAt, speed });
+    window.setTimeout(() => {
+      scrollAndFocus(liveAgentRunRef.current, "center");
+    }, 80);
+
+    try {
+      const [result] = await Promise.all([
+        api.runAgentRail(id),
+        waitForGeminiDemo(speed),
+      ]);
+      const receipt = summarizeGuidedActionResult(actionName, result);
+      await refresh();
+      setActionReceipt(receipt);
+      setLiveAgentRun({ status: "complete", startedAt, speed, receipt });
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete("tab");
+      nextParams.set("intent", "next");
+      setSearchParams(nextParams, { replace: true });
+    } catch (cause) {
+      const message = actionErrorMessage(actionName, cause);
+      setActionError(message);
+      setLiveAgentRun({ status: "error", startedAt, speed, errorMessage: message });
     } finally {
       setBusy(null);
     }
   }
 
   function handleUpdated(updated: LegalRequest) {
+    const refreshSerial = refreshSerialRef.current + 1;
+    refreshSerialRef.current = refreshSerial;
     setRequest(updated);
-    api.auditTimeline(id).then(setAuditEvents).catch(() => undefined);
-    api.finalizationStatus(id)
-      .then(setFinalizationStatus)
-      .catch(() => setFinalizationStatus(null));
+    setSupportingDataWarning(null);
+    refreshSupportingData(refreshSerial);
   }
 
   if (loadError) {
@@ -137,6 +421,7 @@ export default function RequestDetailPage() {
     );
   }
 
+  const currentRequest = request;
   const state = request.workflow_state;
   const hasRuns = Object.keys(request.agent_runs).length > 0;
   const canExtract = state === "request_received";
@@ -152,54 +437,77 @@ export default function RequestDetailPage() {
     (finding) => finding.severity === "blocking",
   );
   const sourceSections = request.source_sections ?? [];
-  const completedAgents = Object.values(request.agent_runs).filter(
-    (run) => run.status === "complete",
-  ).length;
-  const reviewFlags = [
-    ...(request.classification?.review_reasons ?? []),
-    ...Object.values(request.agent_runs).flatMap((run) => run.risk_flags),
-    ...request.deficiency_findings
-      .filter((finding) => finding.severity === "blocking")
-      .map((finding) => finding.code),
-  ];
-
-  const sourceBackedIdentifiers = request.subject_identifiers.filter((identifier) =>
-    Boolean(identifier.source_span),
-  ).length;
-  const blockingFindings = request.deficiency_findings.filter(
-    (finding) => finding.severity === "blocking",
-  ).length;
-  const latestAuditEvent = auditEvents[auditEvents.length - 1];
-  const guidance = buildRequestGuidance({
-    request,
-    auditEvents,
-    finalizationStatus,
+  const {
     completedAgents,
     reviewFlags,
     sourceBackedIdentifiers,
     blockingFindings,
-  });
+    guidance,
+  } = buildGuidanceForRequest(request, auditEvents, finalizationStatus);
+  const latestAuditEvent = auditEvents[auditEvents.length - 1];
   const tabParam = searchParams.get("tab");
+  const intentParam = searchParams.get("intent");
+  const decisionIntent = intentParam === "decision";
+  const decisionPanelCanLead =
+    guidance.primaryActionKind === "focusDecisionPanel" ||
+    guidance.reviewPanelMode === "routeDecision" ||
+    guidance.reviewPanelMode === "finalApproval" ||
+    guidance.reviewPanelMode === "complete";
+  const reviewPanelActive =
+    (decisionPanelCanLead || decisionIntent) && !isRequestDetailTab(tabParam);
   const selectedTab: RequestDetailTab = isRequestDetailTab(tabParam)
     ? tabParam
+    : decisionIntent
+      ? "overview"
+    : intentParam === "next"
+      ? guidance.recommendedTab
     : guidance.recommendedTab;
+  const activeWorkspaceLabel = reviewPanelActive
+    ? "Human decision controls"
+    : REQUEST_TABS.find((tab) => tab.id === selectedTab)?.label ?? "Review workspace";
+  const activeWorkspaceHelper = reviewPanelActive
+    ? "Record the human route, escalation, QA handoff, or final approval when the checklist is ready."
+    : "Use this supporting workspace to finish the current guided task.";
 
-  function handleTabChange(tab: RequestDetailTab) {
+  function handleTabChange(
+    tab: RequestDetailTab,
+    options: { followPrimary?: boolean; focusWorkspace?: boolean } = {},
+  ) {
     const nextParams = new URLSearchParams(searchParams);
-    if (tab === guidance.recommendedTab) {
+    if (options.followPrimary) {
+      nextParams.set("intent", "next");
+    } else {
+      nextParams.delete("intent");
+    }
+    if (
+      options.followPrimary &&
+      !decisionPanelCanLead &&
+      tab === guidance.recommendedTab
+    ) {
       nextParams.delete("tab");
     } else {
       nextParams.set("tab", tab);
     }
     setSearchParams(nextParams, { replace: true });
+    if (options.focusWorkspace) {
+      window.setTimeout(() => {
+        scrollAndFocus(guidedStageRef.current, "start");
+      }, 160);
+    }
   }
 
   function focusDecisionPanel() {
-    reviewRegionRef.current?.scrollIntoView({
-      block: "nearest",
-      behavior: "smooth",
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("tab");
+    nextParams.set("intent", "decision");
+    setSearchParams(nextParams, { replace: true });
+    window.requestAnimationFrame(() => {
+      reviewRegionRef.current?.scrollIntoView({
+        block: "nearest",
+        behavior: "smooth",
+      });
+      reviewRegionRef.current?.focus({ preventScroll: true });
     });
-    reviewRegionRef.current?.focus({ preventScroll: true });
   }
 
   function guidedActionDisabled(kind: RequestGuidedActionKind): boolean {
@@ -215,6 +523,15 @@ export default function RequestDetailPage() {
     if (kind === "runAgents") {
       return !canRunRail;
     }
+    if (
+      kind === "openEvidence" ||
+      kind === "openAgents" ||
+      kind === "openDrafts" ||
+      kind === "openAudit" ||
+      kind === "focusDecisionPanel"
+    ) {
+      return false;
+    }
     return kind === "none";
   }
 
@@ -227,19 +544,31 @@ export default function RequestDetailPage() {
         void run("Validation", () => api.validate(id));
         return;
       case "runAgents":
-        void run("Six-agent workflow", () => api.runAgentRail(id));
+        void runSixAgentWorkflow();
         return;
       case "openEvidence":
-        handleTabChange("evidence");
+        handleTabChange("evidence", {
+          followPrimary: kind === guidance.primaryActionKind,
+          focusWorkspace: true,
+        });
         return;
       case "openAgents":
-        handleTabChange("agents");
+        handleTabChange("agents", {
+          followPrimary: kind === guidance.primaryActionKind,
+          focusWorkspace: true,
+        });
         return;
       case "openDrafts":
-        handleTabChange("drafts");
+        handleTabChange("drafts", {
+          followPrimary: kind === guidance.primaryActionKind,
+          focusWorkspace: true,
+        });
         return;
       case "openAudit":
-        handleTabChange("audit");
+        handleTabChange("audit", {
+          followPrimary: kind === guidance.primaryActionKind,
+          focusWorkspace: true,
+        });
         return;
       case "focusDecisionPanel":
         focusDecisionPanel();
@@ -248,6 +577,26 @@ export default function RequestDetailPage() {
       default:
         return;
     }
+  }
+
+  function handleLocateGuidedTarget() {
+    if (busy === "Six-agent workflow" && liveAgentRun) {
+      scrollAndFocus(liveAgentRunRef.current, "center");
+      return;
+    }
+
+    if (guidance.primaryActionKind === "focusDecisionPanel") {
+      focusDecisionPanel();
+      return;
+    }
+
+    const targetTab = tabForGuidedAction(guidance.primaryActionKind);
+    if (targetTab) {
+      handleTabChange(targetTab, { followPrimary: true, focusWorkspace: true });
+      return;
+    }
+
+    scrollAndFocus(guidedPrimaryActionRef.current, "center");
   }
 
   function resolveTraceTarget(
@@ -274,6 +623,138 @@ export default function RequestDetailPage() {
     return null;
   }
 
+  function renderReviewPanel() {
+    return (
+      <ReviewPanel
+        request={currentRequest}
+        auditEvents={auditEvents}
+        reviewPanelMode={guidance.reviewPanelMode}
+        onUpdated={handleUpdated}
+        onActionResult={(notice, updated) => {
+          setActionReceipt({
+            actionName: "Human decision",
+            title: "Human decision recorded",
+            summary: `${notice} Current state: ${humanizeToken(
+              updated.workflow_state,
+            )}.`,
+            workflowState: updated.workflow_state,
+            auditSummaries: [],
+          });
+          const nextParams = new URLSearchParams(searchParams);
+          nextParams.delete("tab");
+          nextParams.set("intent", "next");
+          setSearchParams(nextParams, { replace: true });
+        }}
+      />
+    );
+  }
+
+  function renderSelectedWorkspace() {
+    if (selectedTab === "overview") {
+      return (
+        <OverviewTab
+          request={currentRequest}
+          completedAgents={completedAgents}
+          reviewFlags={reviewFlags}
+          blockedDeficiency={blockedDeficiency}
+          sourceBackedIdentifiers={sourceBackedIdentifiers}
+          blockingFindings={blockingFindings}
+          onOpenEvidence={() => handleTabChange("evidence")}
+          onOpenAgents={() => handleTabChange("agents")}
+          onOpenDrafts={() => handleTabChange("drafts")}
+        />
+      );
+    }
+
+    if (selectedTab === "evidence") {
+      return (
+        <section
+          aria-labelledby="request-tab-evidence"
+          className="cf-request-tab-panel"
+          id="request-panel-evidence"
+          role="tabpanel"
+        >
+          <div className="cf-detail-grid cf-detail-grid--evidence">
+            <SourceDocumentPanel
+              request={currentRequest}
+              activeTraceTarget={activeTraceTarget}
+            />
+            <ExtractedFieldsPanel
+              request={currentRequest}
+              onUpdated={handleUpdated}
+              onTraceTarget={setActiveTraceTarget}
+              resolveTraceTarget={resolveTraceTarget}
+            />
+          </div>
+        </section>
+      );
+    }
+
+    if (selectedTab === "agents") {
+      return (
+        <AgentsTab
+          request={currentRequest}
+          auditEvents={auditEvents}
+          finalizationStatus={finalizationStatus}
+          hasRuns={hasRuns}
+          runs={toRailRuns(
+            currentRequest.agent_runs,
+            auditActions,
+            currentRequest.agent_run_reviews,
+          )}
+          onOpenSourceTrace={(sourceSpan, fallbackTerms = []) =>
+            setActiveTraceTarget(resolveTraceTarget(sourceSpan, fallbackTerms))
+          }
+          onAcceptAgent={(agentId) =>
+            run("Agent acceptance", () =>
+              api.acceptAgentRun(
+                id,
+                agentId,
+                "Accepted from the Six-Agent Workflow Rail.",
+              ),
+            )
+          }
+          onRerunAgent={(agentId, instruction) =>
+            run("Agent redraft", () =>
+              api.rerunAgent(id, agentId, instruction || undefined),
+            )
+          }
+          agentCommandMode={guidance.agentCommandMode}
+        />
+      );
+    }
+
+    if (selectedTab === "drafts") {
+      return (
+        <DraftsTab
+          request={currentRequest}
+          busy={busy}
+          hasRuns={hasRuns}
+          blockedDeficiency={blockedDeficiency}
+          onDraftPackage={() =>
+            run("Package drafting", () => api.draftProductionPackage(id))
+          }
+          onDraftDeficiency={() =>
+            run("Deficiency response drafting", () =>
+              api.draftDeficiencyResponse(id),
+            )
+          }
+          onUpdated={handleUpdated}
+        />
+      );
+    }
+
+    return <AuditTab auditEvents={auditEvents} />;
+  }
+
+  const primaryActionDisabled = guidedActionDisabled(guidance.primaryActionKind);
+  const primaryActionPulses =
+    !primaryActionDisabled && shouldFocusGuidedPrimary(guidance.primaryActionKind);
+  const stickyActionPulses =
+    !primaryActionDisabled &&
+    !shouldFocusGuidedPrimary(guidance.primaryActionKind) &&
+    guidance.primaryActionKind !== "none";
+
   return (
     <ConsoleShell title={`Request ${request.legal_request_id}`}>
       <div className="cf-request-command">
@@ -295,32 +776,6 @@ export default function RequestDetailPage() {
               Human review controls every route, package, and final audit
               decision.
             </p>
-          </div>
-          <div className="cf-request-header__actions" aria-label="Request actions">
-            <Button
-              variant={canExtract ? "filled" : "tonal"}
-              disabled={!canExtract || busy !== null}
-              onClick={() => run("Extraction", () => api.extract(id))}
-            >
-              {busy === "Extraction" ? "Extracting..." : "Extract request"}
-            </Button>
-            <Button
-              variant={canValidate ? "filled" : "tonal"}
-              disabled={!canValidate || busy !== null}
-              onClick={() => run("Validation", () => api.validate(id))}
-            >
-              {busy === "Validation" ? "Validating..." : "Validate request"}
-            </Button>
-            <Button
-              variant={canRunRail && !hasRuns ? "filled" : "tonal"}
-              glow={canRunRail && !hasRuns}
-              disabled={!canRunRail || busy !== null}
-              onClick={() => run("Six-agent workflow", () => api.runAgentRail(id))}
-            >
-              {busy === "Six-agent workflow"
-                ? "Running six agents..."
-                : "Run six-agent workflow"}
-            </Button>
           </div>
           <div className="cf-request-header__progress">
             <WorkflowProgress state={state} />
@@ -364,120 +819,105 @@ export default function RequestDetailPage() {
           {actionError ? <p className="cf-review__error">{actionError}</p> : null}
         </header>
 
-        <GuidedReviewWorkbench
+        {supportingDataWarning ? (
+          <p className="cf-request-support-warning" role="status">
+            {supportingDataWarning}
+          </p>
+        ) : null}
+
+        <GuidedNextStepBar
           guidance={guidance}
-          primaryActionDisabled={guidedActionDisabled(guidance.primaryActionKind)}
-          onPrimaryAction={() => handleGuidedAction(guidance.primaryActionKind)}
-          onStepSelect={(tab) => handleTabChange(tab)}
-          onOpenEvidence={() => handleTabChange("evidence")}
-          onOpenAgents={() => handleTabChange("agents")}
-          onOpenDrafts={() => handleTabChange("drafts")}
-          onOpenAudit={() => handleTabChange("audit")}
+          busyLabel={busy}
+          liveAgentRunStatus={liveAgentRun?.status ?? null}
+          pulseLocateAction={stickyActionPulses}
+          onLocateNext={handleLocateGuidedTarget}
         />
 
-        <section className="cf-request-workspace" aria-label="Request review workspace">
-          <div className="cf-request-workspace__main">
-            <RequestTabNav selectedTab={selectedTab} onTabChange={handleTabChange} />
-            <div className="cf-request-tab-panels">
-              {selectedTab === "overview" ? (
-                <OverviewTab
-                  request={request}
-                  completedAgents={completedAgents}
-                  reviewFlags={reviewFlags}
-                  blockedDeficiency={blockedDeficiency}
-                  sourceBackedIdentifiers={sourceBackedIdentifiers}
-                  blockingFindings={blockingFindings}
-                  onOpenEvidence={() => handleTabChange("evidence")}
-                  onOpenAgents={() => handleTabChange("agents")}
-                  onOpenDrafts={() => handleTabChange("drafts")}
-                />
-              ) : null}
-              {selectedTab === "evidence" ? (
-                <section
-                  aria-labelledby="request-tab-evidence"
-                  className="cf-request-tab-panel"
-                  id="request-panel-evidence"
-                  role="tabpanel"
-                >
-                  <div className="cf-detail-grid cf-detail-grid--evidence">
-                    <SourceDocumentPanel
-                      request={request}
-                      activeTraceTarget={activeTraceTarget}
-                    />
-                    <ExtractedFieldsPanel
-                      request={request}
-                      onUpdated={handleUpdated}
-                      onTraceTarget={setActiveTraceTarget}
-                      resolveTraceTarget={resolveTraceTarget}
-                    />
-                  </div>
-                </section>
-              ) : null}
-              {selectedTab === "agents" ? (
-                <AgentsTab
-                  request={request}
-                  auditEvents={auditEvents}
-                  finalizationStatus={finalizationStatus}
-                  hasRuns={hasRuns}
-                  runs={toRailRuns(
-                    request.agent_runs,
-                    auditActions,
-                    request.agent_run_reviews,
-                  )}
-                  onOpenSourceTrace={(sourceSpan, fallbackTerms = []) =>
-                    setActiveTraceTarget(resolveTraceTarget(sourceSpan, fallbackTerms))
-                  }
-                  onAcceptAgent={(agentId) =>
-                    run("Agent acceptance", () =>
-                      api.acceptAgentRun(
-                        id,
-                        agentId,
-                        "Accepted from the Six-Agent Workflow Rail.",
-                      ),
-                    )
-                  }
-                  onRerunAgent={(agentId, instruction) =>
-                    run("Agent redraft", () =>
-                      api.rerunAgent(id, agentId, instruction || undefined),
-                    )
-                  }
-                />
-              ) : null}
-              {selectedTab === "drafts" ? (
-                <DraftsTab
-                  request={request}
-                  busy={busy}
-                  hasRuns={hasRuns}
-                  blockedDeficiency={blockedDeficiency}
-                  onDraftPackage={() =>
-                    run("Package drafting", () => api.draftProductionPackage(id))
-                  }
-                  onDraftDeficiency={() =>
-                    run("Deficiency response drafting", () =>
-                      api.draftDeficiencyResponse(id),
-                    )
-                  }
-                  onUpdated={handleUpdated}
-                />
-              ) : null}
-              {selectedTab === "audit" ? (
-                <AuditTab auditEvents={auditEvents} />
-              ) : null}
+        {liveAgentRun ? (
+          <LiveGeminiRunPanel
+            ref={liveAgentRunRef}
+            status={liveAgentRun.status}
+            startedAt={liveAgentRun.startedAt}
+            speed={liveAgentRun.speed}
+            receipt={liveAgentRun.receipt}
+            errorMessage={liveAgentRun.errorMessage}
+          />
+        ) : null}
+
+        <GuidedReviewWorkbench
+          guidance={guidance}
+          actionReceipt={actionReceipt}
+          primaryActionDisabled={primaryActionDisabled}
+          primaryActionRef={guidedPrimaryActionRef}
+          pulsePrimaryAction={primaryActionPulses}
+          busyLabel={busy}
+          onAction={handleGuidedAction}
+          onStepSelect={(step) => {
+            if (step.status !== "pending") {
+              handleTabChange(step.tab);
+            }
+          }}
+        />
+
+        <section
+          className="cf-guided-stage"
+          aria-label="Request review workspace"
+          ref={guidedStageRef}
+          tabIndex={-1}
+        >
+          <div className="cf-guided-stage__header">
+            <div>
+              <span className="cf-guided-workbench__eyebrow">Current workspace</span>
+              <h2>{activeWorkspaceLabel}</h2>
+              <p>{activeWorkspaceHelper}</p>
             </div>
+            {reviewPanelActive ? (
+              <Chip tone="blue" dot>
+                Decision step
+              </Chip>
+            ) : null}
           </div>
-          <aside
-            className="cf-request-workspace__review"
-            aria-label="Human review panel"
-            ref={reviewRegionRef}
-            tabIndex={-1}
+          {reviewPanelActive ? (
+            <div
+              className="cf-guided-support-links"
+              aria-label="Supporting workspaces"
+            >
+              {REQUEST_TABS.map((tab) => (
+                <Button
+                  key={tab.id}
+                  variant="outlined"
+                  size="sm"
+                  onClick={() => handleTabChange(tab.id)}
+                >
+                  {tab.label}
+                </Button>
+              ))}
+            </div>
+          ) : (
+            <RequestTabNav selectedTab={selectedTab} onTabChange={handleTabChange} />
+          )}
+          <div
+            className="cf-guided-stage__body"
+            ref={reviewPanelActive ? reviewRegionRef : undefined}
+            tabIndex={reviewPanelActive ? -1 : undefined}
           >
-            <ReviewPanel
-              request={request}
-              auditEvents={auditEvents}
-              onUpdated={handleUpdated}
-            />
-          </aside>
+            {reviewPanelActive ? renderReviewPanel() : renderSelectedWorkspace()}
+          </div>
         </section>
+
+        {!reviewPanelActive ? (
+          <details
+            className="cf-guided-disclosure cf-guided-decision-disclosure"
+          >
+            <summary>
+              <span>Human decision controls</span>
+              <small>
+                Approve, request changes, escalate, send to QA, or record final approval.
+              </small>
+            </summary>
+            <div className="cf-guided-disclosure__body">{renderReviewPanel()}</div>
+          </details>
+        ) : null}
       </div>
     </ConsoleShell>
   );
@@ -510,113 +950,270 @@ function RequestTabNav({
   );
 }
 
-function GuidedReviewWorkbench({
+function guidedPrimaryChangesState(guidance: RequestGuidance) {
+  return ["extract", "validate", "runAgents"].includes(guidance.primaryActionKind);
+}
+
+function guidedPrimaryLabel(guidance: RequestGuidance, busyLabel: string | null) {
+  const primaryBusy =
+    busyLabel === "Extraction" ||
+    busyLabel === "Validation" ||
+    busyLabel === "Six-agent workflow";
+  if (!primaryBusy) {
+    return guidance.primaryActionLabel;
+  }
+  if (busyLabel === "Extraction") {
+    return "Extracting...";
+  }
+  if (busyLabel === "Validation") {
+    return "Validating...";
+  }
+  return "Running six agents...";
+}
+
+function GuidedNextStepBar({
   guidance,
-  primaryActionDisabled,
-  onPrimaryAction,
-  onStepSelect,
-  onOpenEvidence,
-  onOpenAgents,
-  onOpenDrafts,
-  onOpenAudit,
+  busyLabel,
+  liveAgentRunStatus,
+  pulseLocateAction,
+  onLocateNext,
 }: {
   guidance: RequestGuidance;
-  primaryActionDisabled: boolean;
-  onPrimaryAction: () => void;
-  onStepSelect: (tab: RequestWorkbenchTab) => void;
-  onOpenEvidence: () => void;
-  onOpenAgents: () => void;
-  onOpenDrafts: () => void;
-  onOpenAudit: () => void;
+  busyLabel: string | null;
+  liveAgentRunStatus: LiveGeminiRunStatus | null;
+  pulseLocateAction: boolean;
+  onLocateNext: () => void;
 }) {
+  const agentRunActive = busyLabel === "Six-agent workflow";
+  const nextStep = agentRunActive
+    ? "Gemini agents are running"
+    : liveAgentRunStatus === "complete"
+      ? "Review refreshed agent output"
+      : guidance.nextRequiredAction;
+  const expectation = agentRunActive
+    ? "Watch the live run. The page will refresh outputs when the run completes."
+    : liveAgentRunStatus === "complete"
+      ? "Open the persisted six-agent rail and resolve any review flags."
+      : guidance.resultExpectation;
+  const locateLabel = shouldFocusGuidedPrimary(guidance.primaryActionKind)
+    ? "Show next button"
+    : guidance.primaryActionKind === "focusDecisionPanel"
+      ? "Open decision controls"
+      : "Open workspace";
+  const buttonLabel = agentRunActive ? "Show live run" : locateLabel;
+  return (
+    <section className="cf-next-step-bar" aria-label="Next guided action">
+      <div className="cf-next-step-bar__copy">
+        <span>Next step</span>
+        <strong>{nextStep}</strong>
+        <small>{expectation}</small>
+      </div>
+      <Button
+        variant="tonal"
+        className={pulseLocateAction ? "cf-button--guided-pulse" : undefined}
+        disabled={
+          (busyLabel !== null && !agentRunActive) ||
+          guidance.primaryActionKind === "none"
+        }
+        onClick={onLocateNext}
+      >
+        {busyLabel && !agentRunActive ? "Working..." : buttonLabel}
+      </Button>
+    </section>
+  );
+}
+
+function GuidedReviewWorkbench({
+  guidance,
+  actionReceipt,
+  primaryActionDisabled,
+  primaryActionRef,
+  pulsePrimaryAction,
+  busyLabel,
+  onAction,
+  onStepSelect,
+}: {
+  guidance: RequestGuidance;
+  actionReceipt: GuidedActionReceiptModel | null;
+  primaryActionDisabled: boolean;
+  primaryActionRef: Ref<HTMLButtonElement>;
+  pulsePrimaryAction: boolean;
+  busyLabel: string | null;
+  onAction: (kind: RequestGuidedActionKind) => void;
+  onStepSelect: (step: RequestGuidance["steps"][number]) => void;
+}) {
+  const primaryChangesState = guidedPrimaryChangesState(guidance);
+  const primaryLabel = guidedPrimaryLabel(guidance, busyLabel);
+  const primaryBlocker = guidance.blockerTasks[0];
+
   return (
     <section
       className="cf-guided-workbench"
       aria-labelledby="guided-review-heading"
     >
-      <div className="cf-guided-workbench__rail">
-        <span className="cf-guided-workbench__eyebrow">Review path</span>
-        <ol aria-label="Guided request steps" className="cf-guided-steps">
-          {guidance.steps.map((step, index) => (
-            <li key={step.id}>
-              <button
-                type="button"
-                className={`cf-guided-step cf-guided-step--${step.status}`}
-                aria-current={step.id === guidance.currentStepId ? "step" : undefined}
-                onClick={() => onStepSelect(step.tab)}
-              >
-                <span className="cf-guided-step__index">{index + 1}</span>
-                <span className="cf-guided-step__copy">
-                  <strong>{step.label}</strong>
-                  <small>{step.description}</small>
-                </span>
-                <Chip tone={stepTone(step.status)} dot={step.status !== "pending"}>
-                  {stepStatusLabel(step.status)}
-                </Chip>
-              </button>
-            </li>
-          ))}
-        </ol>
-      </div>
-
       <div className="cf-guided-workbench__focus">
         <span className="cf-guided-workbench__eyebrow">Next required action</span>
         <h2 id="guided-review-heading">{guidance.nextRequiredAction}</h2>
         <p>{guidance.nextActionReason}</p>
+        <p className="cf-guided-expectation">{guidance.resultExpectation}</p>
+        {primaryBlocker ? (
+          <div className="cf-guided-blocker-callout">
+            <Chip tone="red" dot>
+              {primaryBlocker.label}
+            </Chip>
+            <div>
+              <strong>{primaryBlocker.detail}</strong>
+              <Button
+                size="sm"
+                variant="text"
+                onClick={() => onAction(primaryBlocker.actionKind)}
+              >
+                {primaryBlocker.actionLabel}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        {actionReceipt ? (
+          <GuidedActionReceipt
+            receipt={actionReceipt}
+            nextAction={guidance.nextRequiredAction}
+          />
+        ) : null}
         <ul className="cf-guided-checklist" aria-label="Current step checklist">
           {guidance.checklist.map((item) => (
             <li key={item}>{item}</li>
           ))}
         </ul>
+        {guidance.disabledReasons.length > 0 ? (
+          <ul className="cf-guided-disabled-reasons" aria-label="Disabled action reasons">
+            {guidance.disabledReasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        ) : null}
         <div className="cf-guided-workbench__actions">
           <Button
-            variant="filled"
-            glow={!primaryActionDisabled}
+            ref={primaryActionRef}
+            variant={primaryChangesState ? "filled" : "tonal"}
+            glow={primaryChangesState && !primaryActionDisabled}
+            className={pulsePrimaryAction ? "cf-button--guided-pulse" : undefined}
             disabled={primaryActionDisabled}
-            onClick={onPrimaryAction}
+            onClick={() => onAction(guidance.primaryActionKind)}
           >
-            {guidance.primaryActionLabel}
+            {primaryLabel}
           </Button>
-          <Button variant="outlined" onClick={onOpenEvidence}>
-            Evidence & fields
-          </Button>
-          <Button variant="outlined" onClick={onOpenAgents}>
-            Agent outputs
-          </Button>
+          {guidance.secondaryActions.map((action) => (
+            <Button
+              key={`${action.kind}-${action.label}`}
+              variant="outlined"
+              onClick={() => onAction(action.kind)}
+            >
+              {action.label}
+            </Button>
+          ))}
         </div>
       </div>
 
-      <div className="cf-guided-workbench__support">
-        <span className="cf-guided-workbench__eyebrow">Approval gates</span>
-        {guidance.blockers.length > 0 ? (
-          <ul className="cf-guided-blockers" aria-label="Guided review blockers">
-            {guidance.blockers.map((blocker) => (
-              <li key={blocker}>
-                <Chip tone="red" dot>
-                  Blocked
-                </Chip>
-                <span>{blocker}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <div className="cf-guided-ready">
-            <Chip tone="green" dot>
-              No blocking gate
-            </Chip>
-            <p>Use the decision panel when the current step checks are complete.</p>
+      <div className="cf-guided-disclosures">
+        <details className="cf-guided-disclosure">
+          <summary>
+            <span>Workflow map</span>
+            <small>See every request step and jump to completed workspaces.</small>
+          </summary>
+          <div className="cf-guided-disclosure__body">
+            <ol aria-label="Guided request steps" className="cf-guided-steps">
+              {guidance.steps.map((step, index) => (
+                <li key={step.id}>
+                  <button
+                    type="button"
+                    className={`cf-guided-step cf-guided-step--${step.status}`}
+                    aria-current={step.id === guidance.currentStepId ? "step" : undefined}
+                    disabled={step.status === "pending"}
+                    onClick={() => onStepSelect(step)}
+                  >
+                    <span className="cf-guided-step__index">{index + 1}</span>
+                    <span className="cf-guided-step__copy">
+                      <strong>{step.label}</strong>
+                      <small>{step.description}</small>
+                    </span>
+                    <Chip tone={stepTone(step.status)} dot={step.status !== "pending"}>
+                      {stepStatusLabel(step.status)}
+                    </Chip>
+                  </button>
+                </li>
+              ))}
+            </ol>
           </div>
-        )}
-        <div className="cf-guided-support-actions">
-          <Button size="sm" variant="text" onClick={onOpenDrafts}>
-            Draft package
-          </Button>
-          <Button size="sm" variant="text" onClick={onOpenAudit}>
-            Audit trail
-          </Button>
-        </div>
+        </details>
+
+        <details className="cf-guided-disclosure">
+          <summary>
+            <span>
+              {guidance.blockerTasks.length > 0 ? "Issue details" : "Approval gates"}
+            </span>
+            <small>
+              {guidance.blockerTasks.length > 0
+                ? `${guidance.blockerTasks.length} item${
+                    guidance.blockerTasks.length === 1 ? "" : "s"
+                  } must be cleared.`
+                : "No blocking gate is active."}
+            </small>
+          </summary>
+          <div className="cf-guided-disclosure__body">
+            {guidance.blockerTasks.length > 0 ? (
+              <ul className="cf-guided-blockers" aria-label="Guided review blockers">
+                {guidance.blockerTasks.map((blocker) => (
+                  <li key={blocker.detail}>
+                    <Chip tone="red" dot>
+                      {blocker.label}
+                    </Chip>
+                    <span>{blocker.detail}</span>
+                    <Button
+                      size="sm"
+                      variant="text"
+                      onClick={() => onAction(blocker.actionKind)}
+                    >
+                      {blocker.actionLabel}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="cf-guided-ready">
+                <Chip tone="green" dot>
+                  No blocking gate
+                </Chip>
+                <p>Use the decision controls when the current step checks are complete.</p>
+              </div>
+            )}
+          </div>
+        </details>
       </div>
     </section>
+  );
+}
+
+function GuidedActionReceipt({
+  receipt,
+  nextAction,
+}: {
+  receipt: GuidedActionReceiptModel;
+  nextAction: string;
+}) {
+  return (
+    <div className="cf-guided-receipt" role="status" aria-live="polite">
+      <Chip tone="green" dot>
+        Result
+      </Chip>
+      <div>
+        <strong>{receipt.title}</strong>
+        <p>{receipt.summary}</p>
+        {receipt.auditSummaries.slice(0, 2).map((summary) => (
+          <small key={summary}>Audit: {summary}</small>
+        ))}
+        <small>Next: {nextAction}</small>
+      </div>
+    </div>
   );
 }
 
@@ -833,6 +1430,7 @@ function AgentsTab({
   finalizationStatus,
   hasRuns,
   runs,
+  agentCommandMode,
   onOpenSourceTrace,
   onAcceptAgent,
   onRerunAgent,
@@ -842,12 +1440,13 @@ function AgentsTab({
   finalizationStatus: FinalizationStatus | null;
   hasRuns: boolean;
   runs: ReturnType<typeof toRailRuns>;
+  agentCommandMode: RequestAgentCommandMode;
   onOpenSourceTrace: (
     sourceSpan: string | null | undefined,
     fallbackTerms?: string[],
   ) => void;
-  onAcceptAgent: (agentId: string) => void;
-  onRerunAgent: (agentId: string, instruction: string) => void;
+  onAcceptAgent: (agentId: string) => Promise<void> | void;
+  onRerunAgent: (agentId: string, instruction: string) => Promise<void> | void;
 }) {
   return (
     <section
@@ -874,6 +1473,7 @@ function AgentsTab({
         onOpenSourceTrace={onOpenSourceTrace}
         onAcceptAgent={onAcceptAgent}
         onRerunAgent={onRerunAgent}
+        agentCommandMode={agentCommandMode}
       />
     </section>
   );

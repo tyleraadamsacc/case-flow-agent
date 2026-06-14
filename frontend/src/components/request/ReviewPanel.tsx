@@ -8,6 +8,7 @@ import type {
   LegalRequest,
   PackageValidationFinding,
 } from "../../api/types";
+import type { RequestReviewPanelMode } from "../../lib/requestGuidance";
 import { humanizeToken } from "../../lib/requestDisplay";
 import { useOptionalActor } from "../identity/ActorContext";
 import { getActor, roleLabel } from "../identity/actorStore";
@@ -19,8 +20,10 @@ import StatusBadge from "../ui/StatusBadge";
 export interface ReviewPanelProps {
   request: LegalRequest;
   auditEvents: AuditEvent[];
+  reviewPanelMode?: RequestReviewPanelMode;
   /** Called with the updated request after any successful human action. */
   onUpdated: (request: LegalRequest) => void;
+  onActionResult?: (notice: string, request: LegalRequest) => void;
 }
 
 const ATTESTATION_LABELS: Record<AttestationItem, string> = {
@@ -133,7 +136,9 @@ function uniqueFindings(
 export default function ReviewPanel({
   request,
   auditEvents,
+  reviewPanelMode = "supporting",
   onUpdated,
+  onActionResult,
 }: ReviewPanelProps) {
   const actorContext = useOptionalActor();
   const actor = actorContext?.actor ?? getActor();
@@ -174,6 +179,10 @@ export default function ReviewPanel({
   );
   const routeApprovalDisabled = routeApprovalDisabledReasons.length > 0;
   const finalizeDisabled = finalizeReasons.length > 0;
+  const routeDecisionIsCurrent = reviewPanelMode === "routeDecision";
+  const finalApprovalIsCurrent = reviewPanelMode === "finalApproval";
+  const panelIsSupporting =
+    reviewPanelMode === "supporting" || reviewPanelMode === "blocked";
   const primaryActionLabel = finalizeDisabled
     ? routeApprovalDisabled
       ? "Resolve review blockers"
@@ -212,7 +221,9 @@ export default function ReviewPanel({
       const result = await call();
       onUpdated(result.request);
       setComments("");
-      setNotice(result.notice ?? `${name} recorded. Audit event logged.`);
+      const noticeText = result.notice ?? `${name} recorded. Audit event logged.`;
+      setNotice(noticeText);
+      onActionResult?.(noticeText, result.request);
       await refreshFinalizationStatus();
     } catch (cause) {
       if (cause instanceof ApiError) {
@@ -250,6 +261,9 @@ export default function ReviewPanel({
           </Chip>
           <Chip tone="neutral">Role: {roleLabel(actor.role)}</Chip>
           <Chip tone="violet">Synthetic / mock data</Chip>
+          {panelIsSupporting ? (
+            <Chip tone="neutral">Decision controls secondary</Chip>
+          ) : null}
         </div>
 
         {routing ? (
@@ -457,7 +471,8 @@ export default function ReviewPanel({
 
         <div className="cf-review__actions">
           <Button
-            variant="filled"
+            variant={routeDecisionIsCurrent ? "filled" : "outlined"}
+            glow={routeDecisionIsCurrent && !routeApprovalDisabled}
             disabled={routeApprovalDisabled}
             onClick={() =>
               act("Route approval", async () => {
@@ -472,7 +487,8 @@ export default function ReviewPanel({
             {busy === "Route approval" ? "Approving..." : "Approve route"}
           </Button>
           <Button
-            variant="filled"
+            variant={finalApprovalIsCurrent ? "filled" : "outlined"}
+            glow={finalApprovalIsCurrent && !finalizeDisabled}
             disabled={finalizeDisabled}
             onClick={() =>
               act("Approval", async () => {
@@ -493,7 +509,9 @@ export default function ReviewPanel({
         </div>
 
         <div className="cf-review__supporting-actions">
+          <p className="cf-review__supporting-label">Other human decisions</p>
           <Button
+            variant="tonal"
             disabled={busy !== null}
             onClick={() =>
               act("Change request", async () => {
@@ -508,6 +526,7 @@ export default function ReviewPanel({
             Request changes
           </Button>
           <Button
+            variant="tonal"
             disabled={busy !== null}
             onClick={() =>
               act("Escalation", async () => {

@@ -75,6 +75,7 @@ describe("SixAgentWorkflowRail", () => {
     render(<SixAgentWorkflowRail runs={runs} onRerunAgent={onRerunAgent} />);
 
     fireEvent.click(screen.getByRole("button", { name: /Triaging Agent/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Request redraft" }));
     fireEvent.change(screen.getByLabelText(/Ask an agent to revise/i), {
       target: { value: "Re-check date range against request text" },
     });
@@ -84,5 +85,21 @@ describe("SixAgentWorkflowRail", () => {
       "triaging_agent",
       "Re-check date range against request text",
     );
+  });
+
+  it("opens the command bar immediately when the guided step recommends it", () => {
+    const runs: AgentRunLike[] = [
+      {
+        agentId: "triaging_agent",
+        status: "complete",
+        outputSummary: "Classified as Location Data Production.",
+      },
+    ];
+
+    render(<SixAgentWorkflowRail runs={runs} agentCommandMode="recommended" />);
+
+    expect(
+      screen.getByRole("form", { name: "Agent review command bar" }),
+    ).toBeInTheDocument();
   });
 });

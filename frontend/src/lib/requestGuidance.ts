@@ -34,6 +34,28 @@ export type RequestGuidedActionKind =
   | "focusDecisionPanel"
   | "none";
 
+export interface RequestGuidedSecondaryAction {
+  label: string;
+  kind: RequestGuidedActionKind;
+  tab?: RequestWorkbenchTab;
+}
+
+export interface RequestGuidedBlockerTask {
+  label: string;
+  detail: string;
+  actionLabel: string;
+  actionKind: RequestGuidedActionKind;
+}
+
+export type RequestReviewPanelMode =
+  | "supporting"
+  | "routeDecision"
+  | "finalApproval"
+  | "blocked"
+  | "complete";
+
+export type RequestAgentCommandMode = "hidden" | "available" | "recommended";
+
 export interface RequestGuidedStep {
   id: RequestGuidedStepId;
   label: string;
@@ -46,15 +68,37 @@ export interface RequestGuidance {
   currentStepId: RequestGuidedStepId;
   currentStepStatus: RequestGuidedStepStatus;
   recommendedTab: RequestWorkbenchTab;
+  postSuccessTab: RequestWorkbenchTab;
   nextRequiredAction: string;
   nextActionReason: string;
   primaryActionLabel: string;
   primaryActionKind: RequestGuidedActionKind;
+  queueActionLabel: string;
+  resultExpectation: string;
   checklist: string[];
   blockers: string[];
+  blockerTasks: RequestGuidedBlockerTask[];
+  secondaryActions: RequestGuidedSecondaryAction[];
+  disabledReasons: string[];
+  reviewPanelMode: RequestReviewPanelMode;
+  agentCommandMode: RequestAgentCommandMode;
   steps: RequestGuidedStep[];
   queueSummary: string;
 }
+
+type RequestGuidanceCore = Omit<
+  RequestGuidance,
+  | "steps"
+  | "blockers"
+  | "postSuccessTab"
+  | "queueActionLabel"
+  | "resultExpectation"
+  | "blockerTasks"
+  | "secondaryActions"
+  | "disabledReasons"
+  | "reviewPanelMode"
+  | "agentCommandMode"
+>;
 
 interface BuildRequestGuidanceInput {
   request: LegalRequest;
@@ -146,12 +190,17 @@ export function buildRequestGuidance({
     request.text_drafts.length > 0 ||
     request.note_drafts.length > 0;
   const finalizationBlockers = finalizationStatus?.blocking_reasons ?? [];
+  const finalizationIsCurrent = [
+    "analyst_approved",
+    "sent_to_qa",
+    "audit_complete",
+  ].includes(request.workflow_state);
   const blockers = [
     ...request.deficiency_findings
       .filter((finding) => finding.severity === "blocking")
       .map((finding) => humanizeToken(finding.code)),
     ...blockedAgents.map((run) => `${run.agent_name}: ${run.blocked_reason ?? "blocked"}`),
-    ...finalizationBlockers.map(humanizeToken),
+    ...(finalizationIsCurrent ? finalizationBlockers.map(humanizeToken) : []),
   ];
 
   const guidance = resolveGuidance({
@@ -181,6 +230,14 @@ export function buildRequestGuidance({
 
   return {
     ...guidance,
+    postSuccessTab: guidance.recommendedTab,
+    queueActionLabel: queueActionLabel(guidance),
+    resultExpectation: resultExpectation(guidance.primaryActionKind),
+    blockerTasks: blockerTasksFor(unique(blockers)),
+    secondaryActions: secondaryActionsFor(guidance),
+    disabledReasons: disabledReasonsFor(guidance, request, finalizationStatus),
+    reviewPanelMode: reviewPanelModeFor(guidance, request, finalizationStatus),
+    agentCommandMode: agentCommandModeFor(guidance),
     blockers: unique(blockers).slice(0, 5),
     steps,
   };
@@ -210,7 +267,7 @@ function resolveGuidance({
   hasRoute: boolean;
   hasDrafts: boolean;
   finalizationStatus: FinalizationStatus | null;
-}): Omit<RequestGuidance, "steps" | "blockers"> {
+}): RequestGuidanceCore {
   const process = legalProcessLabel(request);
   const lastAuditAction =
     auditEvents.length > 0
@@ -273,7 +330,7 @@ function resolveGuidance({
         ].includes(request.workflow_state))) &&
     blockers.length === 0 &&
     blockerCount === 0 &&
-    allReviewFlags.length === 0
+    (runCount === 0 || allReviewFlags.length === 0)
   ) {
     return {
       currentStepId: "agents",
@@ -300,6 +357,10 @@ function resolveGuidance({
     request.workflow_state === "changes_requested" ||
     request.workflow_state === "escalated"
   ) {
+    const agentBlocker = blockers.find((blocker) => blocker.includes("Agent:"));
+    const [agentBlockerName, agentBlockerReason] = agentBlocker
+      ? agentBlocker.split(/:\s*/, 2)
+      : [null, null];
     return {
       currentStepId: "risks",
       currentStepStatus: blockers.length > 0 || blockerCount > 0 ? "blocked" : "current",
@@ -307,21 +368,31 @@ function resolveGuidance({
       nextRequiredAction:
         request.workflow_state === "escalated"
           ? "Await SME review"
+          : agentBlockerName
+            ? `Review ${agentBlockerName} blocker`
           : "Resolve review flags",
       nextActionReason:
-        blockers.length > 0
+        agentBlockerName
+          ? `${agentBlockerName} is blocked${
+              agentBlockerReason ? `: ${humanizeToken(agentBlockerReason)}` : ""
+            }. Decide whether to escalate, request a redraft, or inspect supporting evidence.`
+          : blockers.length > 0
           ? "Approval is blocked until the listed quality, authority, or agent issues are addressed."
           : "Agent outputs have flags that need human confirmation before approval.",
       primaryActionLabel:
         request.workflow_state === "escalated"
           ? "Review decision panel"
+          : agentBlockerName
+            ? `Open ${agentBlockerName} output`
           : "Review agent output",
       primaryActionKind:
         request.workflow_state === "escalated" ? "focusDecisionPanel" : "openAgents",
       checklist: [
         `${completeAgentCount}/6 agents are complete.`,
-        "Inspect flagged agent output and source-backed evidence.",
-        "Request changes, rerun agents, or escalate when the blocker cannot be resolved.",
+        agentBlockerName
+          ? `Inspect the ${agentBlockerName} output, blocker reason, and evidence.`
+          : "Inspect flagged agent output and source-backed evidence.",
+        "Choose one recovery action: accept, request redraft, request changes, or escalate.",
       ],
       queueSummary:
         request.workflow_state === "escalated"
@@ -433,4 +504,162 @@ function collectReviewFlags(request: LegalRequest): string[] {
 
 function unique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+function queueActionLabel(
+  guidance: RequestGuidanceCore,
+): string {
+  if (guidance.primaryActionKind === "none") {
+    return "Open completed audit";
+  }
+  if (guidance.primaryActionKind === "focusDecisionPanel") {
+    return "Open decision panel";
+  }
+  if (guidance.primaryActionKind === "openAgents") {
+    return "Open agent outputs";
+  }
+  if (guidance.primaryActionKind === "openEvidence") {
+    return "Open evidence";
+  }
+  if (guidance.primaryActionKind === "openDrafts") {
+    return "Open draft package";
+  }
+  if (guidance.primaryActionKind === "openAudit") {
+    return "Open audit trail";
+  }
+  return `Open to ${lowerFirst(guidance.primaryActionLabel)}`;
+}
+
+function resultExpectation(kind: RequestGuidedActionKind): string {
+  switch (kind) {
+    case "extract":
+      return "Creates structured fields and records an extraction audit event.";
+    case "validate":
+      return "Checks extracted fields, special handling, deficiencies, and review policy.";
+    case "runAgents":
+      return "Runs the official six-agent workflow and refreshes agent outputs.";
+    case "focusDecisionPanel":
+      return "Moves focus to the human decision controls without recording a decision.";
+    case "openEvidence":
+    case "openAgents":
+    case "openDrafts":
+    case "openAudit":
+      return "Opens the supporting workspace for the current step.";
+    case "none":
+    default:
+      return "No state-changing action is required.";
+  }
+}
+
+function secondaryActionsFor(
+  guidance: RequestGuidanceCore,
+): RequestGuidedSecondaryAction[] {
+  const actionsByStep: Record<RequestGuidedStepId, RequestGuidedSecondaryAction[]> = {
+    intake: [
+      { label: "Inspect evidence", kind: "openEvidence", tab: "evidence" },
+      { label: "Open audit trail", kind: "openAudit", tab: "audit" },
+    ],
+    evidence: [
+      { label: "Agent outputs", kind: "openAgents", tab: "agents" },
+      { label: "Open audit trail", kind: "openAudit", tab: "audit" },
+    ],
+    agents: [
+      { label: "Inspect evidence", kind: "openEvidence", tab: "evidence" },
+      { label: "Open audit trail", kind: "openAudit", tab: "audit" },
+    ],
+    risks: [
+      { label: "Inspect evidence", kind: "openEvidence", tab: "evidence" },
+      { label: "Open decision panel", kind: "focusDecisionPanel", tab: "overview" },
+    ],
+    decision: [
+      { label: "Agent outputs", kind: "openAgents", tab: "agents" },
+      { label: "Evidence", kind: "openEvidence", tab: "evidence" },
+      { label: "Audit trail", kind: "openAudit", tab: "audit" },
+    ],
+    drafts: [
+      { label: "Agent outputs", kind: "openAgents", tab: "agents" },
+      { label: "Audit trail", kind: "openAudit", tab: "audit" },
+    ],
+    audit: [
+      { label: "Draft package", kind: "openDrafts", tab: "drafts" },
+      { label: "Agent outputs", kind: "openAgents", tab: "agents" },
+    ],
+  };
+  return actionsByStep[guidance.currentStepId].filter(
+    (action) => action.kind !== guidance.primaryActionKind,
+  );
+}
+
+function disabledReasonsFor(
+  guidance: RequestGuidanceCore,
+  request: LegalRequest,
+  finalizationStatus: FinalizationStatus | null,
+): string[] {
+  const reasons: string[] = [];
+  if (guidance.primaryActionKind === "runAgents") {
+    const blockedAgents = Object.values(request.agent_runs ?? {}).filter(
+      (run) => run.status === "blocked" || run.status === "failed",
+    );
+    if (blockedAgents.length > 0) {
+      reasons.push("Resolve blocked agent runs before rerunning the rail.");
+    }
+  }
+  if (
+    guidance.currentStepId === "audit" &&
+    finalizationStatus?.ready_for_approval === false
+  ) {
+    reasons.push("Approval readiness is blocked by the listed finalization reasons.");
+  }
+  if (request.workflow_state === "audit_complete") {
+    reasons.push("Request is already audit complete.");
+  }
+  return reasons;
+}
+
+function blockerTasksFor(blockers: string[]): RequestGuidedBlockerTask[] {
+  return blockers.slice(0, 5).map((blocker) => {
+    const agentBlocked = blocker.includes("Agent:");
+    return {
+      label: agentBlocked ? "Agent blocker" : "Review blocker",
+      detail: blocker,
+      actionLabel: agentBlocked ? "Open agent outputs" : "Inspect evidence",
+      actionKind: agentBlocked ? "openAgents" : "openEvidence",
+    };
+  });
+}
+
+function reviewPanelModeFor(
+  guidance: RequestGuidanceCore,
+  request: LegalRequest,
+  finalizationStatus: FinalizationStatus | null,
+): RequestReviewPanelMode {
+  if (request.workflow_state === "audit_complete") {
+    return "complete";
+  }
+  if (guidance.currentStepId === "risks") {
+    return "blocked";
+  }
+  if (guidance.currentStepId === "decision") {
+    return "routeDecision";
+  }
+  if (guidance.currentStepId === "audit" && finalizationStatus?.ready_for_approval) {
+    return "finalApproval";
+  }
+  return "supporting";
+}
+
+function agentCommandModeFor(
+  guidance: RequestGuidanceCore,
+): RequestAgentCommandMode {
+  if (guidance.currentStepId === "agents" || guidance.currentStepId === "risks") {
+    return "recommended";
+  }
+  if (guidance.currentStepId === "decision") {
+    return "available";
+  }
+  return "hidden";
+}
+
+function lowerFirst(value: string): string {
+  return value.length === 0 ? value : value.charAt(0).toLowerCase() + value.slice(1);
 }

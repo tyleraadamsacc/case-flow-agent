@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from "react";
+import { forwardRef, type ButtonHTMLAttributes } from "react";
 
 export type ButtonVariant = "filled" | "tonal" | "text" | "outlined";
 
@@ -10,15 +10,18 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   glow?: boolean;
 }
 
-export default function Button({
-  variant = "tonal",
-  size = "md",
-  glow = false,
-  className,
-  type = "button",
-  children,
-  ...rest
-}: ButtonProps) {
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  {
+    variant = "tonal",
+    size = "md",
+    glow = false,
+    className,
+    type = "button",
+    children,
+    ...rest
+  },
+  ref,
+) {
   const classes = [
     "cf-button",
     `cf-button--${variant}`,
@@ -30,8 +33,10 @@ export default function Button({
     .join(" ");
 
   return (
-    <button type={type} className={classes} {...rest}>
+    <button ref={ref} type={type} className={classes} {...rest}>
       {children}
     </button>
   );
-}
+});
+
+export default Button;

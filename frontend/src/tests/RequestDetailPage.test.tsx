@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -20,9 +26,9 @@ const OFFICIAL_NAMES = [
   "Automation Agent",
 ];
 
-function renderDetail(id: string) {
+function renderDetail(id: string, initialEntry = `/requests/${id}`) {
   return render(
-    <MemoryRouter initialEntries={[`/requests/${id}`]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/requests/:id" element={<RequestDetailPage />} />
       </Routes>
@@ -46,9 +52,56 @@ const AUDIT_EVENT: AuditEvent = {
   correlation_id: null,
 };
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("RequestDetailPage", () => {
+  it("turns queue next intent into one pulsing primary action and focuses it", async () => {
+    vi.spyOn(api, "getLegalRequest").mockResolvedValue(makeLegalRequest());
+    vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    try {
+      renderDetail(
+        "LER-2026-004812",
+        "/requests/LER-2026-004812?intent=next",
+      );
+
+      const primaryButton = await screen.findByRole("button", {
+        name: "Run six-agent workflow",
+      });
+      expect(primaryButton).toHaveClass("cf-button--guided-pulse");
+      expect(
+        within(screen.getByLabelText("Next guided action")).getByRole("button", {
+          name: "Show next button",
+        }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getAllByRole("button", { name: "Run six-agent workflow" }),
+      ).toHaveLength(1);
+
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+      expect(document.activeElement).toBe(primaryButton);
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+          configurable: true,
+          value: originalScrollIntoView,
+        });
+      } else {
+        delete (HTMLElement.prototype as { scrollIntoView?: unknown })
+          .scrollIntoView;
+      }
+    }
+  });
+
   it("renders a guided request command center with the active next step selected", async () => {
     vi.spyOn(api, "getLegalRequest").mockResolvedValue(makeLegalRequest());
     vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
@@ -59,6 +112,8 @@ describe("RequestDetailPage", () => {
       .toBeInTheDocument();
     expect(screen.getAllByText("Next required action").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Run six-agent workflow").length).toBeGreaterThan(0);
+    expect(screen.getByText("Workflow map")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Workflow map"));
     expect(
       screen.getByRole("list", { name: "Guided request steps" }),
     ).toBeInTheDocument();
@@ -70,6 +125,64 @@ describe("RequestDetailPage", () => {
     expect(screen.getByRole("tab", { name: "Evidence & fields" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Draft package" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Audit trail" })).toBeInTheDocument();
+  });
+
+  it("uses support buttons instead of an unselected tablist when the decision panel is current", async () => {
+    const request = makeLegalRequest({
+      routing_recommendation: {
+        target_queue: "LERS Response",
+        target_owner: "analyst",
+        escalation_target: null,
+        reason: "Location-data warrant is ready for analyst routing.",
+        sla_risk: false,
+        requires_approval: true,
+        evidence_ids: [],
+        status: "recommended_pending_human",
+      },
+      agent_runs: {
+        indexing_agent: makeAgentRun(),
+        triaging_agent: makeAgentRun({
+          agent_id: "triaging_agent",
+          agent_name: "Triaging Agent",
+        }),
+      },
+    });
+    vi.spyOn(api, "getLegalRequest").mockResolvedValue(request);
+    vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
+
+    renderDetail(request.legal_request_id);
+
+    expect(
+      await screen.findByRole("heading", { name: "Human decision controls" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("tablist", { name: "Request sections" }),
+    ).not.toBeInTheDocument();
+    const supportLinks = screen.getByLabelText("Supporting workspaces");
+    expect(supportLinks).toBeInTheDocument();
+
+    fireEvent.click(within(supportLinks).getByRole("button", { name: "Agent outputs" }));
+    expect(
+      await screen.findByRole("tablist", { name: "Request sections" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Agent outputs" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("surfaces non-blocking warnings when supporting status cannot refresh", async () => {
+    vi.spyOn(api, "getLegalRequest").mockResolvedValue(makeLegalRequest());
+    vi.spyOn(api, "auditTimeline").mockRejectedValue(new Error("audit offline"));
+    vi.spyOn(api, "finalizationStatus").mockRejectedValue(
+      new Error("readiness offline"),
+    );
+
+    renderDetail("LER-2026-004812");
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Could not refresh audit trail and approval readiness.",
+    );
   });
 
   it("switches tabs to show evidence and agent workspaces", async () => {
@@ -154,6 +267,72 @@ describe("RequestDetailPage", () => {
     expect(
       await screen.findByText("request_indexed"),
     ).toBeInTheDocument();
+  });
+
+  it("keeps a blocked agent review focused on the agent output before human decisions", async () => {
+    const request = makeLegalRequest({
+      agent_runs: {
+        indexing_agent: makeAgentRun(),
+        triaging_agent: makeAgentRun({
+          agent_id: "triaging_agent",
+          agent_name: "Triaging Agent",
+        }),
+        etl_agent: makeAgentRun({
+          agent_id: "etl_agent",
+          agent_name: "ETL Agent",
+          status: "blocked",
+          blocked_reason: "sme_escalation_pending",
+          risk_flags: ["sme_escalation_pending"],
+          output_summary: "SME escalation is pending before mock retrieval can proceed.",
+        }),
+        note_taking_agent: makeAgentRun({
+          agent_id: "note_taking_agent",
+          agent_name: "Note Taking and Data Entry Agent",
+        }),
+        text_content_agent: makeAgentRun({
+          agent_id: "text_content_agent",
+          agent_name: "Text Content Agent",
+        }),
+        automation_agent: makeAgentRun({
+          agent_id: "automation_agent",
+          agent_name: "Automation Agent",
+        }),
+      },
+    });
+    vi.spyOn(api, "getLegalRequest").mockResolvedValue(request);
+    vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
+
+    renderDetail(request.legal_request_id);
+
+    expect(
+      await screen.findByRole("heading", { name: "Review ETL Agent blocker" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open ETL Agent output" }),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByLabelText("Next guided action")).getByRole("button", {
+        name: "Open workspace",
+      }),
+    ).toHaveClass("cf-button--guided-pulse");
+    expect(
+      screen.getByRole("button", { name: "Open ETL Agent output" }),
+    ).not.toHaveClass("cf-button--guided-pulse");
+    expect(screen.getByRole("tab", { name: "Agent outputs" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      screen.getByRole("heading", { name: "Agent outputs" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Approve route" }),
+    ).not.toBeVisible();
+
+    fireEvent.click(screen.getByText("Human decision controls"));
+    expect(
+      await screen.findByRole("button", { name: "Approve route" }),
+    ).toBeVisible();
   });
 
   it("offers the five human review actions and no agent-side approval", async () => {
@@ -433,7 +612,7 @@ describe("RequestDetailPage", () => {
 
     renderDetail("LER-2026-004812");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Evidence & fields" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Inspect evidence" }));
     expect(screen.getByRole("tab", { name: "Evidence & fields" })).toHaveAttribute(
       "aria-selected",
       "true",
@@ -444,11 +623,183 @@ describe("RequestDetailPage", () => {
       }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Agent outputs" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Agent outputs" }));
     expect(screen.getByRole("tab", { name: "Agent outputs" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
+  });
+
+  it("keeps supporting workspace clicks from snapping back to the primary next tab", async () => {
+    const blockedRequest = makeLegalRequest({
+      agent_runs: {
+        etl_agent: makeAgentRun({
+          agent_id: "etl_agent",
+          agent_name: "ETL Agent",
+          status: "blocked",
+          blocked_reason: "sme_escalation_pending",
+          risk_flags: ["sme_escalation_pending"],
+          confidence: null,
+          evidence_ids: [],
+        }),
+      },
+    });
+    vi.spyOn(api, "getLegalRequest").mockResolvedValue(blockedRequest);
+    vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
+
+    renderDetail(
+      blockedRequest.legal_request_id,
+      `/requests/${blockedRequest.legal_request_id}?intent=next&tab=agents`,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Review ETL Agent blocker" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Agent outputs" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Inspect evidence" })[0],
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Evidence & fields" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
+    );
+    expect(
+      await screen.findByRole("document", {
+        name: "Source request document sections",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a result receipt and the next button after a state-changing click", async () => {
+    const initial = makeLegalRequest({
+      workflow_state: "request_received",
+      requesting_agency: null,
+      legal_process: null,
+    });
+    const extracted = makeLegalRequest({
+      workflow_state: "request_extracted",
+    });
+    vi.spyOn(api, "getLegalRequest")
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(extracted);
+    vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
+    vi.spyOn(api, "extract").mockResolvedValue({
+      legal_request: extracted,
+      deficiency_findings: [],
+      audit_event: {
+        ...AUDIT_EVENT,
+        action: "request_extracted",
+        after_state: "request_extracted",
+        summary: "Extraction completed.",
+      },
+    });
+
+    renderDetail(initial.legal_request_id);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Extract request" }));
+
+    expect(await screen.findByText("Extraction complete")).toBeInTheDocument();
+    expect(screen.getByText("Current state: Request extracted.")).toBeInTheDocument();
+    expect(screen.getByText("Audit: Extraction completed.")).toBeInTheDocument();
+    expect(screen.getByText("Next: Validate extracted fields")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Validate request" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a timed Gemini run and then returns to agent review", async () => {
+    const initial = makeLegalRequest({
+      workflow_state: "request_validated",
+      agent_runs: {},
+    });
+    const updated = makeLegalRequest({
+      workflow_state: "analyst_review_pending",
+      agent_runs: {
+        indexing_agent: makeAgentRun({
+          agent_id: "indexing_agent",
+          agent_name: "Indexing Agent",
+        }),
+        triaging_agent: makeAgentRun({
+          agent_id: "triaging_agent",
+          agent_name: "Triaging Agent",
+          requires_human_review: true,
+          review_reasons: ["location_scope_review"],
+        }),
+        etl_agent: makeAgentRun({
+          agent_id: "etl_agent",
+          agent_name: "ETL Agent",
+        }),
+        note_taking_and_data_entry_agent: makeAgentRun({
+          agent_id: "note_taking_and_data_entry_agent",
+          agent_name: "Note Taking and Data Entry Agent",
+        }),
+        text_content_agent: makeAgentRun({
+          agent_id: "text_content_agent",
+          agent_name: "Text Content Agent",
+        }),
+        automation_agent: makeAgentRun({
+          agent_id: "automation_agent",
+          agent_name: "Automation Agent",
+        }),
+      },
+    });
+    vi.spyOn(api, "getLegalRequest")
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(updated);
+    vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
+    vi.spyOn(api, "finalizationStatus").mockResolvedValue({
+      workflow_state: "analyst_review_pending",
+      required_attestations: [],
+      attested: [],
+      missing_attestations: [],
+      approvals_recorded: 0,
+      approvals_required: 1,
+      requires_senior_approval: false,
+      senior_approval_present: false,
+      blocked_agent_runs: [],
+      blocking_reasons: [],
+      ready_for_approval: false,
+    });
+    vi.spyOn(api, "runAgentRail").mockResolvedValue({
+      legal_request: updated,
+      agent_runs: Object.values(updated.agent_runs),
+    });
+
+    renderDetail(
+      initial.legal_request_id,
+      `/requests/${initial.legal_request_id}?demoSpeed=fast`,
+    );
+
+    fireEvent.click(await screen.findByRole("button", {
+      name: "Run six-agent workflow",
+    }));
+
+    expect(
+      screen.getByRole("region", { name: "Synthetic Gemini live agent run" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Gemini agents are running")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Show live run" })).toBeEnabled();
+    expect(screen.getByText("Source packet")).toBeInTheDocument();
+
+    expect(
+      await screen.findByText("Gemini agent run complete", {}, { timeout: 3000 }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("Six-agent workflow complete").length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getAllByText(/6 agent outputs refreshed/).length).toBeGreaterThan(0);
+    expect(
+      within(screen.getByLabelText("Next guided action")).getByRole("button", {
+        name: "Open workspace",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("exposes stable accessibility labels for the guided request workspace", async () => {
@@ -457,11 +808,14 @@ describe("RequestDetailPage", () => {
 
     renderDetail("LER-2026-004812");
 
-    expect(await screen.findByLabelText("Request actions")).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Run six-agent workflow" }),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("Request readiness summary")).toBeInTheDocument();
+    expect(screen.getByText("Workflow map")).toBeInTheDocument();
     expect(screen.getByRole("tablist", { name: "Request sections" })).toBeInTheDocument();
     expect(screen.getByLabelText("Request review workspace")).toBeInTheDocument();
-    expect(screen.getByLabelText("Human review panel")).toBeInTheDocument();
+    expect(screen.getByText("Human decision controls")).toBeInTheDocument();
     expect(screen.getByLabelText("Current step checklist")).toBeInTheDocument();
   });
 });

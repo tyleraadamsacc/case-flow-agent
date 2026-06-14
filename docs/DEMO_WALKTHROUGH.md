@@ -61,8 +61,9 @@ subscriber information).
 3. **Run six-agent workflow** — the rail fills, and the story is the
    hold: **the ETL Agent is blocked — SME escalation pending.** Text
    Content drafted the SME notification, Automation *prepared* the
-   escalation. Click **Finalize request** to show it refused: blocked
-   agent runs block finalization, audited as such.
+   escalation. The guided workbench keeps the next click on the blocker:
+   inspect the agent output, then use **Escalate to SME** or request a
+   redraft from the rail.
 
    > "The warrant asks for everything and carries every special-handling
    > flag — so the system refuses to simulate the pull until a person
@@ -79,7 +80,7 @@ subscriber information).
    custody ("Internal Location Data Repository Query" by the Legal
    Response Operations Team), and the Jane Doe certification — every
    status still pending until a person approves.
-6. **Finalize request** — now it succeeds: **Audit complete**. The audit
+6. **Record approval** — now it succeeds: **Audit complete**. The audit
    summary shows every agent run (including the blocked one — it stays
    in the trail), the route approval, and the finalization.
 

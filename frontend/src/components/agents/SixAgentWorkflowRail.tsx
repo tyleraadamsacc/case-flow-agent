@@ -6,6 +6,7 @@ import type {
   LegalRequest,
   Role,
 } from "../../api/types";
+import type { RequestAgentCommandMode } from "../../lib/requestGuidance";
 import { AGENT_RAIL_ORDER, AGENT_THEME, type AgentId } from "../../theme/agentTheme";
 import { statusMeta } from "../../theme/status";
 import { useOptionalActor } from "../identity/ActorContext";
@@ -37,6 +38,7 @@ export interface SixAgentWorkflowRailProps {
   ) => void;
   onAcceptAgent?: (agentId: string) => Promise<void> | void;
   onRerunAgent?: (agentId: string, instruction: string) => Promise<void> | void;
+  agentCommandMode?: RequestAgentCommandMode;
 }
 
 type ConsoleStatus =
@@ -159,6 +161,7 @@ export default function SixAgentWorkflowRail({
   onOpenSourceTrace,
   onAcceptAgent,
   onRerunAgent,
+  agentCommandMode = "available",
 }: SixAgentWorkflowRailProps) {
   const actor = useOptionalActor()?.actor;
   const defaultMode = reviewerModeForRole(actor?.role);
@@ -171,6 +174,8 @@ export default function SixAgentWorkflowRail({
   const [commandTarget, setCommandTarget] = useState<CommandTarget>("current");
   const [busyCommand, setBusyCommand] = useState(false);
   const [busyAccept, setBusyAccept] = useState(false);
+  const [commandExpanded, setCommandExpanded] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const agents = useMemo(() => buildConsoleAgents(runs), [runs]);
   const selected = agents.find((agent) => agent.agentId === selectedAgentId) ?? agents[0];
@@ -190,6 +195,16 @@ export default function SixAgentWorkflowRail({
     () => buildWorkflowStory(agents, request, finalizationStatus),
     [agents, request, finalizationStatus],
   );
+  const selectedNeedsCommand =
+    selected.consoleStatus === "blocked" ||
+    selected.consoleStatus === "redraft_requested" ||
+    selected.stale;
+  const hasCommandTargets = targetAgentIds(commandTarget, selected.agentId, agents).some(
+    (agentId) => agents.find((agent) => agent.agentId === agentId)?.run,
+  );
+  const commandRecommended =
+    agentCommandMode === "recommended" || selectedNeedsCommand;
+  const commandVisible = commandRecommended || commandExpanded;
 
   useEffect(() => {
     if (!agents.some((agent) => agent.agentId === selectedAgentId)) {
@@ -197,13 +212,21 @@ export default function SixAgentWorkflowRail({
     }
   }, [agents, selectedAgentId]);
 
+  useEffect(() => {
+    if (commandRecommended) {
+      setCommandExpanded(true);
+    }
+  }, [commandRecommended, selected.agentId]);
+
   async function acceptSelected() {
     if (!onAcceptAgent || !selected.run || selected.run.humanDecision === "accepted") {
       return;
     }
     setBusyAccept(true);
+    setActionNotice(null);
     try {
       await onAcceptAgent(selected.agentId);
+      setActionNotice(`${selected.theme.officialName} output accepted. Audit event logged.`);
     } finally {
       setBusyAccept(false);
     }
@@ -217,14 +240,17 @@ export default function SixAgentWorkflowRail({
       (agentId) => agents.find((agent) => agent.agentId === agentId)?.run,
     );
     if (agentIds.length === 0) {
+      setActionNotice("Select an agent with persisted output before requesting a redraft.");
       return;
     }
     setBusyCommand(true);
+    setActionNotice(null);
     try {
       for (const agentId of agentIds) {
         await onRerunAgent(agentId, commandText.trim());
       }
       setCommandText("");
+      setActionNotice("Redraft requested. Audit event logged and affected output refreshed.");
     } finally {
       setBusyCommand(false);
     }
@@ -344,15 +370,33 @@ export default function SixAgentWorkflowRail({
         </aside>
       </div>
 
-      <CommandBar
-        selectedAgentName={selected.theme.officialName}
-        value={commandText}
-        target={commandTarget}
-        disabled={!onRerunAgent || busyCommand}
-        onChange={setCommandText}
-        onTargetChange={setCommandTarget}
-        onSubmit={runCommand}
-      />
+      {actionNotice ? (
+        <div className="cf-agent-action-receipt" role="status" aria-live="polite">
+          <Chip tone="green" dot>
+            Agent action
+          </Chip>
+          <span>{actionNotice}</span>
+        </div>
+      ) : null}
+
+      {commandVisible ? (
+        <CommandBar
+          selectedAgentName={selected.theme.officialName}
+          value={commandText}
+          target={commandTarget}
+          disabled={!onRerunAgent || busyCommand || !hasCommandTargets}
+          onChange={setCommandText}
+          onTargetChange={setCommandTarget}
+          onSubmit={runCommand}
+        />
+      ) : onRerunAgent && selected.run && agentCommandMode !== "hidden" ? (
+        <div className="cf-command-collapsed">
+          <Button variant="outlined" onClick={() => setCommandExpanded(true)}>
+            Request redraft
+          </Button>
+          <span>Use when this agent output needs a targeted revision.</span>
+        </div>
+      ) : null}
     </section>
   );
 }
