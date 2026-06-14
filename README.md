@@ -1,110 +1,214 @@
-# CaseFlow Agent (Prototype)
+# CaseFlow Agent
 
-CaseFlow Agent is a GCP-native, **human-led** agentic workflow prototype for Google Legal
-Investigations Support / LERS-style request processing:
+CaseFlow is a local demo prototype for a human-led legal request workflow. It
+runs a FastAPI backend and a React/Vite frontend against synthetic mock data.
+No GCP project, API key, Gemini credential, database, or production integration
+is required for the demo.
 
+The demo workflow is:
+
+```text
+Request queue -> request detail -> extract -> validate -> run six agents
+-> review agent output -> inspect evidence -> open decision panel
+-> escalate / approve / QA handoff -> audit trail
 ```
-LERS request intake → extraction → indexing → triage → route / escalation
-→ mock ETL → note drafting → response package drafting → human review
-→ audit trail → governance insights
+
+## Fastest Path For A Demo Operator
+
+If you are not a developer, open this repository in Claude Code or Codex and
+ask:
+
+```text
+Use AGENTS.md and bring CaseFlow up locally in demo mode. Install anything
+missing, start the backend and frontend, verify the mock request is loaded, and
+give me the browser URL.
 ```
 
-The prototype makes the six RFP agents first-class, visible workflow actors:
-**Indexing Agent, Triaging Agent, ETL Agent, Note Taking and Data Entry Agent,
-Text Content Agent, Automation Agent.**
+The agent should start:
 
-The six agents are implemented as named **Google ADK** agents
-(`backend/app/adk_agents/`), orchestrated in rail order by a
-`CaseFlowRootAgent` (ADK `Workflow` graph). ADK owns agent execution only;
-the FastAPI application layer owns APIs, repositories, approval policy, the
-audit service, governance metrics, and all finalization authority. ADK
-session state is an execution scratchpad — persisted records are the source
-of truth.
+- Backend API: `http://localhost:8000`
+- Frontend app: `http://localhost:5173`
+- Demo request: `LER-2026-004812`
+- Best starting page: `http://localhost:5173/requests`
 
-## Guardrails
+## Requirements
 
-- Synthetic / mock data only. No real user data, no real law enforcement data, no real PII.
-- No Law Enforcement disclosure step is automated. Nothing is sent or released automatically.
-- No legal determinations. Every route, note, draft, response package, and escalation is
-  human-reviewed.
-- Every agent and human action writes an audit event.
-- Runs entirely locally with **zero GCP credentials**. GCP integrations arrive later behind
-  swappable adapters.
+Install these before running the app:
 
-This is a demo prototype. It must not be read as production legal automation.
+- Python 3.11 or newer
+- Node.js 18 or newer
+- npm
+- Git
 
-## Quickstart
-
-Requires Python 3.11+ and Node 18+.
+On macOS, Claude Code/Codex can check this with:
 
 ```bash
-cp .env.local.example .env.local   # no credentials needed; defaults are fine
-make install                       # backend venv + frontend node_modules
-make test                          # backend test suite
-make test-frontend                 # frontend test suite (Vitest)
-make dev-backend                   # FastAPI on http://localhost:8000 (GET /healthz)
-make dev-frontend                  # Vite dev server (proxies /healthz and /api to :8000)
+python3.13 --version || python3.12 --version || python3.11 --version || python3 --version
+node --version
+npm --version
+git --version
 ```
 
-With both servers running, `http://localhost:5173` opens the console.
-A scripted ~10-minute leadership demo lives in
-[docs/DEMO_WALKTHROUGH.md](docs/DEMO_WALKTHROUGH.md);
-the definition-of-done status is tracked in
-[docs/DOD_CHECKLIST.md](docs/DOD_CHECKLIST.md).
-Open a request to walk the full workflow in the browser: extract → validate →
-run the six-agent workflow → review the drafts → approve/escalate/send to QA —
-every step human-decided and audited. The frontend design system lives in
-[frontend/UI_THEME_AND_GEMINI_UX_GUIDE.md](frontend/UI_THEME_AND_GEMINI_UX_GUIDE.md);
-a living component reference renders at `http://localhost:5173/design-system`.
+The Makefile automatically prefers `python3.13`, then `python3.12`, then
+`python3.11`, then `python3`.
 
-## Repository layout
+## Local Demo Setup
 
-```
-backend/    FastAPI application and tests (Python)
-frontend/   React + Vite + TypeScript SPA shell
-caseflow_codex_handoff_docs_v3_six_agent_visibility/   source handoff documents
-CASEFLOW_APPLICATION_BUILD_PLAN_FOR_REVIEW.md          implementation plan and PR roadmap
+From a clean checkout of `origin/develop`:
+
+```bash
+git checkout develop
+git pull origin develop
+cp .env.local.example .env.local
+make install
 ```
 
-## Current state (PR 1 + PR 2 backend)
+`make install` creates the backend virtual environment under `backend/.venv`
+and installs frontend dependencies under `frontend/node_modules`.
 
-The deterministic backend is feature-complete for the demo workflow:
+The `.env.local` file is only for local settings. It must not contain secrets.
+The demo defaults are deterministic and synthetic.
 
-- typed Pydantic domain models (`backend/app/models/`), workflow state
-  machine, and code-enforced approval policy (`backend/app/orchestration/`)
-- single-path audit service over an append-only local repository — an audit
-  write failure blocks the state transition (and agent-run persistence)
-- **six-agent deterministic ADK workflow**: each agent reads context from
-  ADK session state (scratchpad only), produces a typed structured output,
-  and the execution bridge (`orchestration/agent_execution_service.py`)
-  persists one `AgentRun` + exactly one audit event per run — blocked runs
-  included. The agent-run repository, never session state, feeds the API.
-- eight seeded synthetic scenarios (A–F plus regulator/sensitive-sender and
-  low-confidence) and an idempotent mock-data loader
-- response package / no-records / deficiency-response / SME-notification
-  drafting per the Template LERS Response structure — all drafts are
-  type-constrained to pending-human statuses
-- local evidence retrieval (`GET /api/evidence`) resolving every stable
-  evidence id the agents emit
-- APIs: request queue/detail (incl. `agent_runs`), extract, validate,
-  `agents/run` (full rail), agent-runs, responsive-records, production
-  package + deficiency drafting, review/approve/escalate/send-to-qa, audit
-  timeline + global query (`?agent=` filter), and governance: summary,
-  agent-activity (RFP Agent Coverage), work-needing-attention,
-  product-volume, processing-time-by-product, bottlenecks, audit-readiness,
-  response-package-status
-- twelve golden scenarios (`make test-golden`) and a backend demo runner
-  (`make demo-scenario-a`)
-- Gemini *preparation* scaffolding only (`backend/app/llm/`): MockModelClient,
-  config-driven ModelRouter, structured-output validation — no live model
-  integration exists and no `google-genai` dependency is declared
+## Start The App
 
-Intentionally deferred: Gemini-backed agent behavior (PR 8), Agent
-Search/Firestore/Cloud Storage adapters (PR 10), and the frontend workflow
-screens (PR 6–7).
+Use two terminals.
 
-## Roadmap
+Terminal 1, backend:
 
-The PR sequence and full build plan live in
-[CASEFLOW_APPLICATION_BUILD_PLAN_FOR_REVIEW.md](CASEFLOW_APPLICATION_BUILD_PLAN_FOR_REVIEW.md)
-(§18–§19).
+```bash
+make dev-backend
+```
+
+Expected backend URL:
+
+```text
+http://localhost:8000/healthz
+```
+
+Terminal 2, frontend:
+
+```bash
+make dev-frontend
+```
+
+Expected frontend URL:
+
+```text
+http://localhost:5173
+```
+
+Open the request queue directly:
+
+```text
+http://localhost:5173/requests
+```
+
+Click request `LER-2026-004812` and follow the highlighted next action buttons.
+
+## Verify The Demo Loaded
+
+Run these checks after both servers are up:
+
+```bash
+curl -fsS http://localhost:8000/healthz
+curl -fsS http://localhost:8000/api/legal-requests
+curl -fsS http://localhost:8000/api/governance/summary
+```
+
+The request list should include `LER-2026-004812`. This request comes from:
+
+```text
+backend/app/mock_data/legal_requests_demo/two_document_lers_warrant.json
+```
+
+Demo mode seeds only the focused two-document LERS scenario. The larger
+scenario corpus is for tests.
+
+## Useful Pages
+
+- Request queue: `http://localhost:5173/requests`
+- Request detail: `http://localhost:5173/requests/LER-2026-004812`
+- Governance dashboard: `http://localhost:5173/governance`
+- Work needing attention: `http://localhost:5173/attention`
+- Audit page: `http://localhost:5173/audit`
+
+The demo slide walkthrough lives in:
+
+```text
+docs/demo-flow-slides/
+```
+
+The written demo walkthrough is:
+
+```text
+docs/DEMO_WALKTHROUGH.md
+```
+
+## Reset Local Demo Data
+
+Local demo state is in memory. Stop and restart the backend to reseed from the
+mock demo fixture:
+
+```bash
+make demo-reset
+make dev-backend
+```
+
+## Common Fixes
+
+If the frontend cannot load data:
+
+1. Confirm the backend is running:
+
+   ```bash
+   curl -fsS http://localhost:8000/healthz
+   ```
+
+2. Confirm the frontend dev server is running:
+
+   ```text
+   http://localhost:5173
+   ```
+
+3. Restart both servers from the repository root:
+
+   ```bash
+   make dev-backend
+   make dev-frontend
+   ```
+
+If port `8000` or `5173` is busy, ask Claude Code/Codex to inspect the process
+and either stop the old CaseFlow server or start on a different port with the
+frontend proxy pointed at the backend.
+
+## Tests For Developers
+
+These are not required for a demo operator, but they are useful before making
+changes:
+
+```bash
+make test
+make test-frontend
+make lint
+make build-frontend
+```
+
+## Safety Guardrails
+
+- Synthetic / mock data only.
+- No real user data, law enforcement data, or production data.
+- No GCP deployment for local demo mode.
+- No service account keys.
+- No API keys.
+- No live Gemini dependency.
+- No Firestore, Cloud Storage, Agent Search, or production LERS/Cases
+  integration.
+- No automated disclosure or release step. Human review remains in control.
+
+## Repository Layout
+
+```text
+backend/    FastAPI backend, ADK agents, mock data, tests
+frontend/   React + Vite + TypeScript frontend
+docs/       Demo walkthroughs and supporting notes
+```
