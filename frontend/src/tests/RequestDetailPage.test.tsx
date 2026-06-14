@@ -630,6 +630,53 @@ describe("RequestDetailPage", () => {
     );
   });
 
+  it("keeps supporting workspace clicks from snapping back to the primary next tab", async () => {
+    const blockedRequest = makeLegalRequest({
+      agent_runs: {
+        etl_agent: makeAgentRun({
+          agent_id: "etl_agent",
+          agent_name: "ETL Agent",
+          status: "blocked",
+          blocked_reason: "sme_escalation_pending",
+          risk_flags: ["sme_escalation_pending"],
+          confidence: null,
+          evidence_ids: [],
+        }),
+      },
+    });
+    vi.spyOn(api, "getLegalRequest").mockResolvedValue(blockedRequest);
+    vi.spyOn(api, "auditTimeline").mockResolvedValue([]);
+
+    renderDetail(
+      blockedRequest.legal_request_id,
+      `/requests/${blockedRequest.legal_request_id}?intent=next&tab=agents`,
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Review ETL Agent blocker" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Agent outputs" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Inspect evidence" })[0],
+    );
+
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Evidence & fields" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      ),
+    );
+    expect(
+      await screen.findByRole("document", {
+        name: "Source request document sections",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("shows a result receipt and the next button after a state-changing click", async () => {
     const initial = makeLegalRequest({
       workflow_state: "request_received",

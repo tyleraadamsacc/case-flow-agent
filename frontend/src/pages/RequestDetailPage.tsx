@@ -471,20 +471,29 @@ export default function RequestDetailPage() {
 
   function handleTabChange(
     tab: RequestDetailTab,
-    options: { guidedIntent?: boolean } = {},
+    options: { followPrimary?: boolean; focusWorkspace?: boolean } = {},
   ) {
     const nextParams = new URLSearchParams(searchParams);
-    if (options.guidedIntent) {
+    if (options.followPrimary) {
       nextParams.set("intent", "next");
     } else {
       nextParams.delete("intent");
     }
-    if (!decisionPanelCanLead && tab === guidance.recommendedTab) {
+    if (
+      options.followPrimary &&
+      !decisionPanelCanLead &&
+      tab === guidance.recommendedTab
+    ) {
       nextParams.delete("tab");
     } else {
       nextParams.set("tab", tab);
     }
     setSearchParams(nextParams, { replace: true });
+    if (options.focusWorkspace) {
+      window.setTimeout(() => {
+        scrollAndFocus(guidedStageRef.current, "start");
+      }, 160);
+    }
   }
 
   function focusDecisionPanel() {
@@ -538,16 +547,28 @@ export default function RequestDetailPage() {
         void runSixAgentWorkflow();
         return;
       case "openEvidence":
-        handleTabChange("evidence", { guidedIntent: true });
+        handleTabChange("evidence", {
+          followPrimary: kind === guidance.primaryActionKind,
+          focusWorkspace: true,
+        });
         return;
       case "openAgents":
-        handleTabChange("agents", { guidedIntent: true });
+        handleTabChange("agents", {
+          followPrimary: kind === guidance.primaryActionKind,
+          focusWorkspace: true,
+        });
         return;
       case "openDrafts":
-        handleTabChange("drafts", { guidedIntent: true });
+        handleTabChange("drafts", {
+          followPrimary: kind === guidance.primaryActionKind,
+          focusWorkspace: true,
+        });
         return;
       case "openAudit":
-        handleTabChange("audit", { guidedIntent: true });
+        handleTabChange("audit", {
+          followPrimary: kind === guidance.primaryActionKind,
+          focusWorkspace: true,
+        });
         return;
       case "focusDecisionPanel":
         focusDecisionPanel();
@@ -571,7 +592,7 @@ export default function RequestDetailPage() {
 
     const targetTab = tabForGuidedAction(guidance.primaryActionKind);
     if (targetTab) {
-      handleTabChange(targetTab, { guidedIntent: true });
+      handleTabChange(targetTab, { followPrimary: true, focusWorkspace: true });
       return;
     }
 
